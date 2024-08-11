@@ -13,7 +13,7 @@ def save_fixed_interval_activity_data(filename):
 
     # Read the input file with specified column names
     aruba_df = pd.read_csv(
-        filename, delim_whitespace=True, header=None, names=["date", "time", "device", "status", "activity", "label"]
+        filename, sep="\s+", header=None, names=["date", "time", "device", "status", "activity", "label"]
     )
 
     # Combine 'date' and 'time' columns into a single datetime column 'Time'
@@ -28,13 +28,16 @@ def save_fixed_interval_activity_data(filename):
     # Set the 'Time' column as the index
     filtered_aruba_df.set_index("Time", inplace=True)
 
+    # Remove duplicate timestamps
+    filtered_aruba_df = filtered_aruba_df[~filtered_aruba_df.index.duplicated(keep="first")]
+
     # Resample the data to 1-minute intervals, forward filling missing values
-    fixed_interval_activity_df = filtered_aruba_df.resample("1T").ffill()
+    fixed_interval_activity_df = filtered_aruba_df.resample("1min").ffill()
 
     # Drop any rows with NaN values and save the result to a CSV file
     fixed_interval_activity_df.dropna().to_csv("[ARUBA]-activities_fixed_interval_data.csv")
 
 
 if __name__ == "__main__":
-    filename = "activity_monitoring/ARUBA/data"
+    filename = "ARUBA/data"
     save_fixed_interval_activity_data(filename)
