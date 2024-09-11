@@ -79,10 +79,10 @@ input("\nPress Enter to continue...")
 
 # Define importance weights for anomaly detection
 importance_weights = {
-    "sleep_count": 0.4,
-    "sleep_disturbances": 0.3,
-    "meal_preparation_count": 0.15,
-    "eating_count": 0.15,
+    "sleep_count": 0.6,
+    "sleep_disturbances": 0.25,
+    "meal_preparation_count": 0.05,
+    "eating_count": 0.1,
 }
 
 
