@@ -28,28 +28,55 @@ print("\nData after dropping missing values:")
 print(df.head())  # Print a subset
 input("\nPress Enter to continue...")
 
-# Filter only relevant activities for health analysis
-activities_of_interest = ["Sleeping", "Meal_Preparation", "Bed_to_Toilet", "Eating"]
-df_filtered = df[df["activity"].isin(activities_of_interest)]
-
-print("\nFiltered dataset (only health-related activities):")
-print(df_filtered.head())  # Show first few rows of filtered data
-input("\nPress Enter to continue...")
-
 # Set 'Time' as the index for easier resampling and time-based operations
-df_filtered.set_index("Time", inplace=True)
+df.set_index("Time", inplace=True)
 
-# Resample data to ensure each activity is reported in consistent 1-minute intervals
-df_resampled = df_filtered.resample("1T").ffill()
+# Ensure the data is at a 1-minute interval (forward fill if there are any gaps)
+df_resampled = df.resample("1T").ffill()
 
 print("\nResampled data with 1-minute intervals:")
 print(df_resampled.head())  # Show first few rows of resampled data
 input("\nPress Enter to continue...")
 
-# Split the dataset into training and monitoring sets
-split_point = "2012-01-07"  # Example split point - adjust as necessary
-df_train = df_resampled[:split_point]  # Training data before split
-df_monitor = df_resampled[split_point:]  # Monitoring data after split
+# Aggregate data on a per-day basis
+# Count occurrences of each activity per day
+df_daily = df_resampled.groupby(df_resampled.index.date).apply(lambda x: x["activity"].value_counts())
+
+print("\nDaily aggregated data (activity counts per day):")
+print(df_daily.head())  # Show first few rows of aggregated daily data
+input("\nPress Enter to continue...")
+
+
+# Define specific metrics like sleep_count and sleep disturbances
+def compute_daily_stats(x):
+    return pd.Series(
+        {
+            "sleep_count": (x["activity"] == "Sleeping").sum(),
+            "sleep_disturbances": (x["activity"] == "Bed_to_Toilet").sum(),
+            "meal_preparation_count": (x["activity"] == "Meal_Preparation").sum(),
+            "eating_count": (x["activity"] == "Eating").sum(),
+        }
+    )
+
+
+df_daily_stats = df_resampled.groupby(df_resampled.index.date).apply(compute_daily_stats)
+
+print("\nDaily stats calculated:")
+print(df_daily_stats.head())  # Show first few rows of daily stats
+input("\nPress Enter to continue...")
+
+# Determine the split date based on 80% of the total dates
+unique_dates = df_daily_stats.index
+total_dates = len(unique_dates)
+split_point_index = int(total_dates * 0.8)  # 80% for training, 20% for monitoring
+split_date = unique_dates[split_point_index]
+
+print(f"\nDetermined split date: {split_date}")
+input("\nPress Enter to continue...")
+
+# Split data into training and monitoring based on the split date
+df_train = df_daily_stats[df_daily_stats.index < split_date]  # Training data before the split date
+df_monitor = df_daily_stats[df_daily_stats.index >= split_date]  # Monitoring data from the split date onward
 
 print("\nTraining data sample:")
 print(df_train.head())
@@ -57,30 +84,15 @@ print("\nMonitoring data sample:")
 print(df_monitor.head())
 input("\nPress Enter to continue...")
 
-# Compute total duration for each activity in both training and monitoring periods
-activity_duration_train = df_train.groupby("activity").size()
-activity_duration_monitor = df_monitor.groupby("activity").size()
 
-print("\nActivity duration in training data:")
-print(activity_duration_train)
-input("\nPress Enter to continue...")
-
-print("\nActivity duration in monitoring data:")
-print(activity_duration_monitor)
-input("\nPress Enter to continue...")
-
-
-# Define a function to compute personalized profile (mean and covariance)
+# Define a function to compute personalized profile (mean and covariance) based on daily stats
 def compute_personal_profile(df):
-    # Compute total duration for relevant activities
-    activity_durations = df.groupby("activity").size().reindex(activities_of_interest, fill_value=0)
-
-    # Create a vector of activity durations
-    activity_vector = activity_durations.to_numpy()
+    # Convert the daily stats into a NumPy matrix
+    activity_matrix = df.to_numpy()
 
     # Return mean and covariance for this person's activity profile
-    mean_vector = activity_vector.mean()  # Mean of activity durations
-    cov_matrix = np.cov(activity_vector, rowvar=False)  # Covariance of activity durations
+    mean_vector = activity_matrix.mean(axis=0)  # Mean of daily stats
+    cov_matrix = np.cov(activity_matrix, rowvar=False)  # Covariance of daily stats
     return mean_vector, cov_matrix
 
 
@@ -101,9 +113,8 @@ def compute_likelihood(activity_vector, mean_vector, cov_matrix):
 
 
 # Anomaly detection function
-def detect_anomaly(activity_vector, mean_vector, cov_matrix, threshold=0.01):
+def detect_anomaly(activity_vector, mean_vector, cov_matrix, threshold=0.001):
     likelihood = compute_likelihood(activity_vector, mean_vector, cov_matrix)
-
     # If likelihood is an array, check if any value is below the threshold
     if np.isscalar(likelihood):  # If it's a single value
         if likelihood < threshold:
@@ -117,12 +128,11 @@ def detect_anomaly(activity_vector, mean_vector, cov_matrix, threshold=0.01):
             return "Normal", likelihood
 
 
-# Compute generalized mean and covariance for the entire population (could be other data)
+# Compute generalized mean and covariance for the entire population (using training data)
 def compute_general_model(df_population):
-    mean_vector_gen = df_population.groupby("activity").size().reindex(activities_of_interest, fill_value=0).mean()
-    cov_matrix_gen = np.cov(
-        df_population.groupby("activity").size().reindex(activities_of_interest, fill_value=0), rowvar=False
-    )
+    activity_matrix = df_population.to_numpy()
+    mean_vector_gen = activity_matrix.mean(axis=0)
+    cov_matrix_gen = np.cov(activity_matrix, rowvar=False)
     return mean_vector_gen, cov_matrix_gen
 
 
@@ -136,31 +146,38 @@ def update_grist_score(personal_status, generalized_status):
         return "Normal"
 
 
-# Monitoring function that uses monitoring data and the personal profile to detect anomalies
-def monitor_activities(df_monitor, mean_vector_train, cov_matrix_train, df_population):
+# Monitoring function that computes daily Grist Score for each day in the monitoring period
+def monitor_activities_daily(df_monitor, mean_vector_train, cov_matrix_train, df_population):
     # Compute generalized mean and covariance for population
     mean_vector_gen, cov_matrix_gen = compute_general_model(df_population)
 
-    # Extract activity durations for the monitoring period
-    activity_durations_monitor = df_monitor.groupby("activity").size().reindex(activities_of_interest, fill_value=0)
-    activity_vector_monitor = activity_durations_monitor.to_numpy()
+    scores = []
+    for day, stats in df_monitor.iterrows():
+        # Extract daily stats for this day
+        activity_vector_monitor = stats.to_numpy()
 
-    # Detect anomalies based on personal profile
-    personal_status, likelihood_personal = detect_anomaly(activity_vector_monitor, mean_vector_train, cov_matrix_train)
+        # Detect anomalies based on personal profile
+        personal_status, likelihood_personal = detect_anomaly(
+            activity_vector_monitor, mean_vector_train, cov_matrix_train
+        )
 
-    # Detect anomalies based on generalized population profile
-    generalized_status, likelihood_general = detect_anomaly(activity_vector_monitor, mean_vector_gen, cov_matrix_gen)
+        # Detect anomalies based on generalized population profile
+        generalized_status, likelihood_general = detect_anomaly(
+            activity_vector_monitor, mean_vector_gen, cov_matrix_gen
+        )
 
-    # Update grist score based on the statuses
-    grist_score = update_grist_score(personal_status, generalized_status)
+        # Update grist score based on the statuses
+        grist_score = update_grist_score(personal_status, generalized_status)
+        scores.append((day, grist_score))
 
-    return grist_score, likelihood_personal, likelihood_general
+    return scores
 
 
 # Example usage
-grist_score, likelihood_personal, likelihood_general = monitor_activities(
-    df_monitor, mean_vector_train, cov_matrix_train, df_resampled
-)
-print(f"\nGrist Score: {grist_score}")
-print(f"Likelihood (Personal): {likelihood_personal}")
-print(f"Likelihood (General): {likelihood_general}")
+daily_grist_scores = monitor_activities_daily(df_monitor, mean_vector_train, cov_matrix_train, df_train)
+
+print("\nDaily Grist Scores:")
+for day, score in daily_grist_scores:
+    print(f"Date: {day}, Grist Score: {score}")
+
+input("\nPress Enter to finish...")
