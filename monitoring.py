@@ -45,8 +45,6 @@ def compute_daily_stats(x):
         {
             "sleep_count": (x["activity"] == "Sleeping").sum(),
             "sleep_disturbances": (x["activity"] == "Bed_to_Toilet").sum(),
-            "meal_preparation_count": (x["activity"] == "Meal_Preparation").sum(),
-            "eating_count": (x["activity"] == "Eating").sum(),
         }
     )
 
@@ -81,8 +79,6 @@ input("\nPress Enter to continue...")
 importance_weights = {
     "sleep_count": 0.6,
     "sleep_disturbances": 0.25,
-    "meal_preparation_count": 0.05,
-    "eating_count": 0.1,
 }
 
 
