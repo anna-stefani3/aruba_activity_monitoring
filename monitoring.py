@@ -117,19 +117,9 @@ def detect_anomaly(activity_vector, mean_vector, cov_matrix, threshold=0.01):
         return "Normal", p_value
 
 
-# Function to compute generalized model for the entire population
-def compute_general_model(df_population):
-    activity_matrix = df_population.to_numpy()
-    mean_vector_gen = activity_matrix.mean(axis=0)
-    cov_matrix_gen = np.cov(activity_matrix, rowvar=False)
-    return mean_vector_gen, cov_matrix_gen
-
-
 # Function to update Grist score
-def update_grist_score(personal_status, generalized_status):
-    if personal_status == "Anomaly Detected" and generalized_status == "Anomaly Detected":
-        return "Critical"
-    elif personal_status == "Anomaly Detected":
+def update_grist_score(personal_status):
+    if personal_status == "Anomaly Detected":
         return "Alert"
     else:
         return "Normal"
@@ -137,19 +127,14 @@ def update_grist_score(personal_status, generalized_status):
 
 # Monitoring function that computes daily Grist Score
 def monitor_activities_daily(df_monitor, mean_vector_train, cov_matrix_train, df_population):
-    mean_vector_gen, cov_matrix_gen = compute_general_model(df_population)
-
     scores = []
     for day, stats in df_monitor.iterrows():
         activity_vector_monitor = stats.to_numpy()
 
-        personal_status, p_value_personal = detect_anomaly(activity_vector_monitor, mean_vector_train, cov_matrix_train)
+        personal_status, _ = detect_anomaly(activity_vector_monitor, mean_vector_train, cov_matrix_train)
 
-        generalized_status, p_value_general = detect_anomaly(activity_vector_monitor, mean_vector_gen, cov_matrix_gen)
-
-        grist_score = update_grist_score(personal_status, generalized_status)
-        scores.append((day, grist_score, p_value_personal, p_value_general))
-
+        grist_score = update_grist_score(personal_status)
+        scores.append((day, grist_score, stats))
     return scores
 
 
@@ -157,7 +142,5 @@ def monitor_activities_daily(df_monitor, mean_vector_train, cov_matrix_train, df
 daily_grist_scores = monitor_activities_daily(df_monitor, mean_vector_train, cov_matrix_train, df_train)
 
 print("\nDaily Grist Scores with p-values:")
-for day, score, p_personal, p_general in daily_grist_scores:
-    print(f"Date: {day}, Grist Score: {score}, Personal p-value: {p_personal:.4f}, General p-value: {p_general:.4f}")
-
-input("\nPress Enter to finish...")
+for day, score, stats in daily_grist_scores:
+    print(f"Date: {day}, Grist Score: {score}, Sleep data -> [{stats['sleep_count']}, {stats['sleep_disturbances']}]")
