@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from scipy.stats import multivariate_normal, chi2
+from scipy.stats import chi2
 
 # Load the dataset
 df = pd.read_csv("[ARUBA]-activities_fixed_interval_data.csv")
@@ -9,10 +9,6 @@ print("Data loaded successfully:")
 print(df.head())
 input("\nPress Enter to continue...")
 
-# Assuming the two columns are "Time" and "activity", if they are concatenated, try to split them
-if len(df.columns) == 1:
-    df = df["Time"].str.split(",", expand=True)
-    df.columns = ["Time", "activity"]
 
 print("\nColumn names after checking:")
 print(df.columns)
@@ -31,13 +27,6 @@ input("\nPress Enter to continue...")
 # Set 'Time' as the index for easier resampling and time-based operations
 df.set_index("Time", inplace=True)
 
-# Ensure the data is at a 1-minute interval (forward fill if there are any gaps)
-df_resampled = df.resample("1T").ffill()
-
-print("\nResampled data with 1-minute intervals:")
-print(df_resampled.head())
-input("\nPress Enter to continue...")
-
 
 # Define function to compute daily stats
 def compute_daily_stats(x):
@@ -50,7 +39,7 @@ def compute_daily_stats(x):
 
 
 # Compute daily stats
-df_daily_stats = df_resampled.groupby(df_resampled.index.date).apply(compute_daily_stats)
+df_daily_stats = df.groupby(df.index.date).apply(compute_daily_stats)
 
 print("\nDaily stats calculated:")
 print(df_daily_stats.head())
@@ -59,7 +48,7 @@ input("\nPress Enter to continue...")
 # Determine the split date based on 80% of the total dates
 unique_dates = df_daily_stats.index
 total_dates = len(unique_dates)
-split_point_index = int(total_dates * 0.8)
+split_point_index = int(total_dates * 0.1)
 split_date = unique_dates[split_point_index]
 
 print(f"\nDetermined split date: {split_date}")
@@ -77,8 +66,8 @@ input("\nPress Enter to continue...")
 
 # Define importance weights for anomaly detection
 importance_weights = {
-    "sleep_count": 0.6,
-    "sleep_disturbances": 0.25,
+    "sleep_count": 1,
+    "sleep_disturbances": 0.8,
 }
 
 
