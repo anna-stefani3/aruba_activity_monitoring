@@ -1,198 +1,169 @@
-# Required Libraries
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy import stats
 from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import StandardScaler
+from scipy import stats
 import numpy as np
-from datetime import datetime
 
-# Step 1: Load Data
-print("Step 1: Loading the dataset")
+# Load Data
 file_path = "[ARUBA]-activities_fixed_interval_data.csv"
 df = pd.read_csv(file_path)
-
-# Overview of the dataset
-print("Initial overview of dataset:")
-print(df.head())
-print(df.info())
-input("Press Enter to continue to the next step...")
-
-# Step 2: Preprocessing the Data
-print("\nStep 2: Preprocessing Data")
-# Convert 'Time' column to datetime format
 df["Time"] = pd.to_datetime(df["Time"])
+df.set_index("Time", inplace=True)  # Set 'Time' as the index for easier resampling
+df["Date"] = df.index.date  # Extract Date
 
-# Checking for missing values
-missing_values = df.isnull().sum()
-print(f"Missing values in each column:\n{missing_values}")
-input("Press Enter to continue after reviewing missing values...")
+# 1. Print summary of data after loading
+print("Step 1: Data Loaded")
+print(df.head())
+input("Press Enter to continue...")
 
-# Fill missing values (if any)
-if missing_values.any():
-    df = df.fillna(method="ffill")  # Forward fill any missing values for simplicity
-    print("Missing values have been filled using forward fill method.")
-else:
-    print("No missing values detected.")
+# Filter relevant activities only
+relevant_activities = ["Sleeping", "Bed_to_Toilet", "Eating", "Meal_Preparation"]
+df = df[df["activity"].isin(relevant_activities)]
 
-input("Press Enter to continue after missing value handling...")
 
-# Step 3: Activity Frequency Count
-print("\nStep 3: Analyzing Activity Frequency")
-activity_counts = df["activity"].value_counts()
-print("Activity frequency counts:\n", activity_counts)
+# Convert time to decimal representation
+def time_to_decimal(t):
+    return t.hour + t.minute / 60
 
-# Plot the activity frequency
-plt.figure(figsize=(10, 6))
-sns.barplot(x=activity_counts.index, y=activity_counts.values)
-plt.title("Activity Frequency")
-plt.xticks(rotation=45)
-plt.ylabel("Count")
-plt.xlabel("Activity")
-plt.tight_layout()
-plt.show()
-input("Press Enter to continue after viewing the activity frequency plot...")
 
-# Step 4: Time Segmentation by Day
-print("\nStep 4: Time Segmentation by Day")
-# Extract date and hour from 'Time' for day-based analysis
-df["date"] = df["Time"].dt.date
-df["hour"] = df["Time"].dt.hour
-df["minute"] = df["Time"].dt.minute
+# Define function to compute daily stats
+def compute_daily_stats(x):
+    activity_shifted = x["activity"].shift(1)
 
-# Aggregating data by day and checking activity per day
-daywise_activity = df.groupby(["date", "activity"]).size().unstack(fill_value=0)
-print("Day-wise distribution of activities:\n", daywise_activity.head())
+    # Count transitions from Sleeping to Bed_to_Toilet
+    sleep_to_bed_to_toilet = ((x["activity"] == "Bed_to_Toilet") & (activity_shifted == "Sleeping")).sum()
 
-# Plot daily activity distribution for top activities
-plt.figure(figsize=(12, 8))
-for activity in ["Sleeping", "Meal_Preparation", "Relax", "Work"]:
-    sns.lineplot(data=daywise_activity[activity], label=activity)
-plt.title("Daily Distribution of Key Activities")
-plt.ylabel("Count")
-plt.xlabel("Day")
-plt.legend()
-plt.tight_layout()
-plt.show()
+    # Time when the person went to sleep
+    sleep_start_times = x[(x["activity"] == "Sleeping") & (~activity_shifted.isin(["Sleeping", "Bed_to_Toilet"]))].index
+    if not sleep_start_times.empty:
+        sleep_start = time_to_decimal(sleep_start_times[0])
+    else:
+        sleep_start = None
 
-input("Press Enter to continue after reviewing the daily activity distribution plot...")
+    # Time when the person woke up
+    wake_up_times = x[~x["activity"].isin(["Sleeping", "Bed_to_Toilet"])].index
+    if not wake_up_times.empty:
+        wake_up = time_to_decimal(wake_up_times[0])
+    else:
+        wake_up = None
 
-# Step 5: Day-wise Sleep Patterns
-print("\nStep 5: Identifying Day-wise Sleep Patterns")
+    return pd.Series(
+        {
+            "sleep_count": (x["activity"] == "Sleeping").sum(),
+            "sleep_disturbances": sleep_to_bed_to_toilet,
+            "sleep_start_time": sleep_start,
+            "wake_up_time": wake_up,
+            "eating_count": (x["activity"] == "Eating").sum(),
+            "meal_preparation_count": (x["activity"] == "Meal_Preparation").sum(),
+        }
+    )
 
-# Filtering out 'Sleeping' activity data
-sleep_data = df[df["activity"] == "Sleeping"]
 
-# Aggregating sleep duration per day
-sleep_data["sleep_duration"] = sleep_data.groupby("date")["Time"].diff().dt.total_seconds().fillna(0)
-daily_sleep_duration = sleep_data.groupby("date")["sleep_duration"].sum() / 3600  # in hours
+# Compute daily stats for all activities
+df_daily_stats = df.groupby(df.index.date).apply(compute_daily_stats)
 
-# Extracting time of first sleep activity each day (sleep onset time)
-sleep_onset_time = sleep_data.groupby("date")["Time"].first().dt.time
+# 2. Print summary of daily aggregated data
+print("Step 2: Date-wise aggregated data computed:")
+print(df_daily_stats.head())
+input("Press Enter to continue...")
 
-# Plot sleep duration per day
-plt.figure(figsize=(10, 6))
-sns.barplot(x=daily_sleep_duration.index, y=daily_sleep_duration.values)
-plt.title("Daily Sleep Duration (Hours)")
-plt.xticks(rotation=45)
-plt.ylabel("Total Sleep Hours")
-plt.xlabel("Day")
-plt.tight_layout()
-plt.show()
+# Handle missing data by filling with zeros
+df_daily_stats = df_daily_stats.fillna(0)
 
-print(f"Daily sleep duration (in hours):\n{daily_sleep_duration}")
-print(f"Time at which sleep starts each day:\n{sleep_onset_time}")
-input("Press Enter to continue after reviewing daily sleep data...")
 
-# Step 6: Sleep Disturbance Count per Day
-print("\nStep 6: Identifying Day-wise Sleep Disturbances")
+# Normalcy Test on Each Column
+def perform_normalcy_test(data, column):
+    # Shapiro-Wilk Test for normality
+    stat, p = stats.shapiro(data.dropna())
+    print(f"Normalcy test for {column}:")
+    print(f"  Statistics = {stat}, p-value = {p}")
+    if p > 0.05:
+        print("  Data looks normal (fail to reject H0)")
+    else:
+        print("  Data does not look normal (reject H0)")
 
-# Assuming 'Bed_to_Toilet' represents sleep disturbance
-disturbance_data = df[df["activity"] == "Bed_to_Toilet"]
 
-# Count the number of sleep disturbances per day
-daily_disturbance_count = disturbance_data.groupby("date").size()
+# 3. Perform normalcy test and show outputs for each column and combination
+print("Step 3: Performing normalcy tests on each column and combination...")
 
-# Plot sleep disturbance count per day
-plt.figure(figsize=(10, 6))
-sns.barplot(x=daily_disturbance_count.index, y=daily_disturbance_count.values)
-plt.title("Daily Sleep Disturbance Count")
-plt.xticks(rotation=45)
-plt.ylabel("Disturbance Count")
-plt.xlabel("Day")
-plt.tight_layout()
-plt.show()
+# Test each column individually
+for col in df_daily_stats.columns:
+    perform_normalcy_test(df_daily_stats[col], col)
 
-print(f"Daily sleep disturbance count:\n{daily_disturbance_count}")
-input("Press Enter to continue after reviewing sleep disturbance data...")
+# Test combinations of columns
+combo_cols = ["sleep_count", "sleep_disturbances", "eating_count", "meal_preparation_count"]
+combo_data = df_daily_stats[combo_cols].dropna()
 
-# Step 7: Gaussian Mixture Model (for activity clustering)
-print("\nStep 7: Applying Gaussian Mixture Model for activity clustering")
-# Creating a feature matrix for Gaussian Mixture Model (based on hour and activity)
-df["activity_encoded"] = pd.Categorical(df["activity"]).codes
-X = df[["hour", "activity_encoded"]].to_numpy()
+# Test for combination
+print("Normalcy test for combined columns (sum):")
+perform_normalcy_test(combo_data.sum(axis=1), "combined_columns_sum")
 
-# Fitting a Gaussian Mixture Model
-gmm = GaussianMixture(n_components=3, covariance_type="full", random_state=42)
-gmm.fit(X)
+input("Press Enter to continue...")
 
-# Predict clusters
-df["cluster"] = gmm.predict(X)
+# Split Data into 20%-80% ratio based on days
+total_days = df_daily_stats.shape[0]
+split_index = int(total_days * 0.2)
 
-# Display a sample of the clustering results
-print("Sample of clustering results:")
-print(df[["Time", "activity", "hour", "cluster"]].head())
-input("Press Enter to continue after reviewing the clustering results...")
+train_data = df_daily_stats.iloc[:split_index]
+test_data = df_daily_stats.iloc[split_index:]
 
-# Step 8: Visualizing Clusters
-print("\nStep 8: Visualizing Clusters")
-plt.figure(figsize=(10, 6))
-sns.scatterplot(x="hour", y="activity_encoded", hue="cluster", data=df, palette="tab10")
-plt.title("Activity Clusters based on Gaussian Mixture Model")
-plt.xlabel("Hour of the Day")
-plt.ylabel("Encoded Activity")
-plt.legend(title="Cluster")
-plt.tight_layout()
-plt.show()
+# 4. Show summary of train and test data
+print(f"Step 4: Data split completed.")
+print(f"\nTraining Data Summary:")
+print(train_data.describe())
+print(f"\nTesting Data Summary:")
+print(test_data.describe())
+input("Press Enter to continue...")
 
-input("Press Enter to continue after viewing the clustering visualization...")
+# Train GMM model on train data
+scaler = StandardScaler()
+train_scaled = scaler.fit_transform(train_data)  # Use all columns for fitting
 
-# Step 9: Normality Testing
-print("\nStep 9: Normality Testing")
-# Perform normality test (Shapiro-Wilk) on sleep duration (or any other feature)
-shapiro_test = stats.shapiro(daily_sleep_duration)
-print(f"Shapiro-Wilk test statistic: {shapiro_test.statistic}, p-value: {shapiro_test.pvalue}")
-if shapiro_test.pvalue > 0.05:
-    print("The daily sleep duration follows a normal distribution.")
-else:
-    print("The daily sleep duration does not follow a normal distribution.")
+gmm = GaussianMixture(n_components=2, random_state=42)  # Adjust components if necessary
+gmm.fit(train_scaled)
 
-input("Press Enter to continue after reviewing the normality test results...")
+# 5. Print relevant GMM details
+print("Step 5: GMM model training completed.")
+print("GMM Converged:", gmm.converged_)
+print("Means:", gmm.means_)
+print("Covariances:", gmm.covariances_)
+input("Press Enter to continue...")
 
-# Step 10: Applying Rule-based Detection for Sleep Anomalies
-print("\nStep 10: Rule-based Anomaly Detection for Sleep Behavior")
-# Define thresholds (these can be changed based on specific needs)
-sleep_threshold = 7  # hours
-disturbance_threshold = 3  # arbitrary disturbance count threshold
 
-# Checking if sleep duration per day is below threshold
-anomalies = daily_sleep_duration[daily_sleep_duration < sleep_threshold]
-if not anomalies.empty:
-    print(f"Warning: Sleep duration below {sleep_threshold} hours on these days:\n{anomalies}")
-else:
-    print(f"Sleep duration is within normal range on all days.")
+def detect_anomaly(data_point, gmm_model, scaler, feature_names):
+    # Convert the data_point into a DataFrame with appropriate column names
+    data_point_df = pd.DataFrame([data_point], columns=feature_names)
+    scaled_point = scaler.transform(data_point_df)
+    score = gmm_model.score_samples(scaled_point)
+    return score[0]
 
-# Checking for sleep disturbance anomalies (more than 3 disturbances in a day)
-disturbance_anomalies = daily_disturbance_count[daily_disturbance_count > disturbance_threshold]
-if not disturbance_anomalies.empty:
-    print(f"Warning: More than {disturbance_threshold} disturbances detected on these days:\n{disturbance_anomalies}")
-else:
-    print("Disturbances are within acceptable range.")
 
-input("Press Enter to complete the analysis...")
+recent_scores = []
 
-# Final Step: Wrap-up and Insights
-print("\nStep 11: Analysis Complete")
-print(
-    "You have completed the analysis. Review the above steps and results to refine or rerun any specific parts of the process."
-)
+alert_triggered = False
+window_size = 5
+
+# Get feature names from training data
+feature_names = train_data.columns
+
+# Simulate real-time arrival of each day's data
+for i in range(test_data.shape[0]):
+    day_data = test_data.iloc[i]  # Simulate getting one day's data
+    anomaly_score = detect_anomaly(day_data, gmm, scaler, feature_names)
+
+    # Maintain the sliding window of the last 14 days' scores
+    if len(recent_scores) >= window_size:
+        recent_scores.pop(0)  # Remove the oldest score to keep only the last 14 days
+    recent_scores.append(anomaly_score)
+
+    # Only start anomaly detection after we have 14 days of data
+    if len(recent_scores) == window_size:
+        avg_recent_score = np.mean(recent_scores)
+
+        # Check if today's anomaly score is significantly lower (indicating an anomaly)
+        if anomaly_score < (avg_recent_score - 3):  # Adjust threshold as necessary
+            print(f"Day {str(i).rjust(3)} : {test_data.index[i]} - Abnormal")
+            alert_triggered = True
+
+if not alert_triggered:
+    print("No abnormal patterns detected over the simulated period.")
