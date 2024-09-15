@@ -16,10 +16,6 @@ print("Step 1: Data Loaded")
 print(df.head())
 input("Press Enter to continue...")
 
-# Filter relevant activities only
-relevant_activities = ["Sleeping", "Bed_to_Toilet", "Eating", "Meal_Preparation"]
-df = df[df["activity"].isin(relevant_activities)]
-
 
 # Convert time to decimal representation
 def time_to_decimal(t):
