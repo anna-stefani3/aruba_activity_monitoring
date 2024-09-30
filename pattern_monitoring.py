@@ -3,6 +3,8 @@ from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 from scipy import stats
 import numpy as np
+from pprint import pprint
+from generalised_monitoring import GeneralisedMonitoring
 
 # Load Data
 file_path = "[ARUBA]-activities_fixed_interval_data.csv"
@@ -16,19 +18,23 @@ print("Step 1: Data Loaded")
 print(df.head())
 input("Press Enter to continue...")
 
+
 # Convert time to decimal representation
 def time_to_decimal(t):
     return t.hour + t.minute / 60
 
+
 # Identify night-time activities dynamically
-def classify_night_activities(df, start_hour=20, end_hour=6):
-    df['Hour'] = df.index.hour
+def classify_night_activities(df, start_hour=18, end_hour=4):
+    df["Hour"] = df.index.hour
     # Classify night activities based on time boundaries
-    df['Is_Night'] = (df['Hour'] >= start_hour) | (df['Hour'] <= end_hour)
+    df["Is_Night"] = (df["Hour"] >= start_hour) | (df["Hour"] <= end_hour)
     return df
+
 
 # Apply night-time activity classification
 df = classify_night_activities(df)
+
 
 # Define function to compute daily stats
 def compute_daily_stats(x):
@@ -38,7 +44,9 @@ def compute_daily_stats(x):
     sleep_to_bed_to_toilet = ((x["activity"] == "Bed_to_Toilet") & (activity_shifted == "Sleeping")).sum()
 
     # Time when the person went to sleep (considering night-time activities)
-    sleep_start_times = x[(x["activity"] == "Sleeping") & (x["Is_Night"]) & (~activity_shifted.isin(["Sleeping", "Bed_to_Toilet"]))].index
+    sleep_start_times = x[
+        (x["activity"] == "Sleeping") & (x["Is_Night"]) & (~activity_shifted.isin(["Sleeping", "Bed_to_Toilet"]))
+    ].index
     if not sleep_start_times.empty:
         sleep_start = time_to_decimal(sleep_start_times[0])
     else:
@@ -62,6 +70,7 @@ def compute_daily_stats(x):
         }
     )
 
+
 # Step 2: Compute daily stats for all activities
 df_daily_stats = df.groupby(df.index.date).apply(compute_daily_stats)
 
@@ -74,11 +83,12 @@ input("Press Enter to continue...")
 df_daily_stats = df_daily_stats.fillna(0)
 
 # Create combined features (sleep disturbances + early wake-up, eating and sleep disturbances, etc.)
-df_daily_stats['sleep_drift'] = df_daily_stats['wake_up_time'].diff().fillna(0)
+df_daily_stats["sleep_drift"] = df_daily_stats["wake_up_time"].diff().fillna(0)
 
 # Add sliding window features (e.g., 5-day rolling mean)
-df_daily_stats['rolling_sleep_count'] = df_daily_stats['sleep_count'].rolling(window=5).mean().fillna(0)
-df_daily_stats['rolling_sleep_disturbances'] = df_daily_stats['sleep_disturbances'].rolling(window=5).mean().fillna(0)
+df_daily_stats["rolling_sleep_count"] = df_daily_stats["sleep_count"].rolling(window=5).mean().fillna(0)
+df_daily_stats["rolling_sleep_disturbances"] = df_daily_stats["sleep_disturbances"].rolling(window=5).mean().fillna(0)
+
 
 # Normalcy Test on Each Column
 def perform_normalcy_test(data, column):
@@ -89,6 +99,7 @@ def perform_normalcy_test(data, column):
         print("  Data looks normal (fail to reject H0)")
     else:
         print("  Data does not look normal (reject H0)")
+
 
 # Step 3: Perform normalcy test and show outputs for each column and combination
 print("Step 3: Performing normalcy tests on each column and combination...")
@@ -132,6 +143,7 @@ print("Means:", gmm.means_)
 print("Covariances:", gmm.covariances_)
 input("Press Enter to continue...")
 
+
 # Function to detect anomaly
 def detect_anomaly(data_point, gmm_model, scaler, feature_names):
     data_point_df = pd.DataFrame([data_point], columns=feature_names)
@@ -139,17 +151,21 @@ def detect_anomaly(data_point, gmm_model, scaler, feature_names):
     score = gmm_model.score_samples(scaled_point)
     return score[0]
 
+
 recent_scores = []
 alert_triggered = False
 window_size = 5
 feature_names = train_data.columns
 
+
 # Dynamically adjust anomaly threshold based on window statistics
-def dynamic_threshold(recent_scores, std_multiplier=3):
+def dynamic_threshold(recent_scores):
     mean_score = np.mean(recent_scores)
     std_dev = np.std(recent_scores)
-    return mean_score - (std_multiplier * std_dev)
+    return mean_score - std_dev
 
+
+generalised_monitoring = GeneralisedMonitoring()
 # Step 6: Simulate real-time anomaly detection
 for i in range(test_data.shape[0]):
     day_data = test_data.iloc[i]
@@ -161,10 +177,13 @@ for i in range(test_data.shape[0]):
 
     if len(recent_scores) == window_size:
         threshold = dynamic_threshold(recent_scores)
-        
+
         if anomaly_score < threshold:  # Use dynamic threshold here
             print(f"Day {str(i).rjust(3)} : {test_data.index[i]} - Abnormal")
-            print(f"Explanation: Anomaly Score ({anomaly_score}) is below dynamic threshold ({threshold})")
+            risks_analysis = generalised_monitoring.highlight_risks(day_data)
+            pprint(risks_analysis)
+            print("\n\n")
+            # print(f"Explanation: Anomaly Score ({anomaly_score}) is below dynamic threshold ({threshold})")
             alert_triggered = True
 
 if not alert_triggered:

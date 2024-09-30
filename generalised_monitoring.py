@@ -77,17 +77,34 @@ class GeneralisedMonitoring:
 
     def highlight_risks(self, day_data):
         """
-        Apply rule-based checks to a single day's data.
+        Apply rule-based checks to a single day's data and return only those with risks.
         """
-        day_result = {"Date": day_data.name}
+        day_result = {}
 
         # Apply each rule-based check
-        day_result["Sleep Check"] = self.check_sleep_duration(day_data["sleep_count"])
-        day_result["Sleep Disturbance Check"] = self.check_sleep_disturbances(day_data["sleep_disturbances"])
-        day_result["Eating Check"] = self.check_eating_events(day_data["eating_count"])
-        day_result["Meal Preparation Check"] = self.check_meal_preparation(day_data["meal_preparation_count"])
-        day_result["Wake-up Check"] = self.check_wake_up_time(day_data["wake_up_time"])
-        day_result["Sleep Start Time Check"] = self.check_sleep_start_time(day_data["sleep_start_time"])
+        sleep_check = self.check_sleep_duration(day_data["sleep_count"])
+        if "Deprivation" in sleep_check or "Oversleeping" in sleep_check:
+            day_result["Sleep Check"] = sleep_check
+
+        sleep_disturbance_check = self.check_sleep_disturbances(day_data["sleep_disturbances"])
+        if "Poor Sleep Quality" in sleep_disturbance_check:
+            day_result["Sleep Disturbance Check"] = sleep_disturbance_check
+
+        eating_check = self.check_eating_events(day_data["eating_count"])
+        if "No Eating Events" in eating_check or "Excessive Eating" in eating_check:
+            day_result["Eating Check"] = eating_check
+
+        meal_preparation_check = self.check_meal_preparation(day_data["meal_preparation_count"])
+        if "No Meal Preparation" in meal_preparation_check:
+            day_result["Meal Preparation Check"] = meal_preparation_check
+
+        wake_up_check = self.check_wake_up_time(day_data["wake_up_time"])
+        if "Abnormal" in wake_up_check:
+            day_result["Wake-up Check"] = wake_up_check
+
+        sleep_start_time_check = self.check_sleep_start_time(day_data["sleep_start_time"])
+        if "Abnormal" in sleep_start_time_check:
+            day_result["Sleep Start Time Check"] = sleep_start_time_check
 
         return day_result
 
