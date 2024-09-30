@@ -11,16 +11,24 @@ df["Time"] = pd.to_datetime(df["Time"])
 df.set_index("Time", inplace=True)  # Set 'Time' as the index for easier resampling
 df["Date"] = df.index.date  # Extract Date
 
-# 1. Print summary of data after loading
+# Step 1: Print summary of data after loading
 print("Step 1: Data Loaded")
 print(df.head())
 input("Press Enter to continue...")
-
 
 # Convert time to decimal representation
 def time_to_decimal(t):
     return t.hour + t.minute / 60
 
+# Identify night-time activities dynamically
+def classify_night_activities(df, start_hour=20, end_hour=6):
+    df['Hour'] = df.index.hour
+    # Classify night activities based on time boundaries
+    df['Is_Night'] = (df['Hour'] >= start_hour) | (df['Hour'] <= end_hour)
+    return df
+
+# Apply night-time activity classification
+df = classify_night_activities(df)
 
 # Define function to compute daily stats
 def compute_daily_stats(x):
@@ -29,15 +37,15 @@ def compute_daily_stats(x):
     # Count transitions from Sleeping to Bed_to_Toilet
     sleep_to_bed_to_toilet = ((x["activity"] == "Bed_to_Toilet") & (activity_shifted == "Sleeping")).sum()
 
-    # Time when the person went to sleep
-    sleep_start_times = x[(x["activity"] == "Sleeping") & (~activity_shifted.isin(["Sleeping", "Bed_to_Toilet"]))].index
+    # Time when the person went to sleep (considering night-time activities)
+    sleep_start_times = x[(x["activity"] == "Sleeping") & (x["Is_Night"]) & (~activity_shifted.isin(["Sleeping", "Bed_to_Toilet"]))].index
     if not sleep_start_times.empty:
         sleep_start = time_to_decimal(sleep_start_times[0])
     else:
         sleep_start = None
 
     # Time when the person woke up
-    wake_up_times = x[~x["activity"].isin(["Sleeping", "Bed_to_Toilet"])].index
+    wake_up_times = x[~x["activity"].isin(["Sleeping", "Bed_to_Toilet"]) & x["Is_Night"]].index
     if not wake_up_times.empty:
         wake_up = time_to_decimal(wake_up_times[0])
     else:
@@ -54,11 +62,10 @@ def compute_daily_stats(x):
         }
     )
 
-
-# Compute daily stats for all activities
+# Step 2: Compute daily stats for all activities
 df_daily_stats = df.groupby(df.index.date).apply(compute_daily_stats)
 
-# 2. Print summary of daily aggregated data
+# Print summary of daily aggregated data
 print("Step 2: Date-wise aggregated data computed:")
 print(df_daily_stats.head())
 input("Press Enter to continue...")
@@ -66,10 +73,15 @@ input("Press Enter to continue...")
 # Handle missing data by filling with zeros
 df_daily_stats = df_daily_stats.fillna(0)
 
+# Create combined features (sleep disturbances + early wake-up, eating and sleep disturbances, etc.)
+df_daily_stats['sleep_drift'] = df_daily_stats['wake_up_time'].diff().fillna(0)
+
+# Add sliding window features (e.g., 5-day rolling mean)
+df_daily_stats['rolling_sleep_count'] = df_daily_stats['sleep_count'].rolling(window=5).mean().fillna(0)
+df_daily_stats['rolling_sleep_disturbances'] = df_daily_stats['sleep_disturbances'].rolling(window=5).mean().fillna(0)
 
 # Normalcy Test on Each Column
 def perform_normalcy_test(data, column):
-    # Shapiro-Wilk Test for normality
     stat, p = stats.shapiro(data.dropna())
     print(f"Normalcy test for {column}:")
     print(f"  Statistics = {stat}, p-value = {p}")
@@ -78,20 +90,15 @@ def perform_normalcy_test(data, column):
     else:
         print("  Data does not look normal (reject H0)")
 
-
-# 3. Perform normalcy test and show outputs for each column and combination
+# Step 3: Perform normalcy test and show outputs for each column and combination
 print("Step 3: Performing normalcy tests on each column and combination...")
 
-# Test each column individually
 for col in df_daily_stats.columns:
     perform_normalcy_test(df_daily_stats[col], col)
 
 # Test combinations of columns
-combo_cols = ["sleep_count", "sleep_disturbances", "eating_count", "meal_preparation_count"]
+combo_cols = ["sleep_count", "sleep_disturbances", "eating_count", "meal_preparation_count", "sleep_drift"]
 combo_data = df_daily_stats[combo_cols].dropna()
-
-# Test for combination
-print("Normalcy test for combined columns (sum):")
 perform_normalcy_test(combo_data.sum(axis=1), "combined_columns_sum")
 
 input("Press Enter to continue...")
@@ -103,7 +110,7 @@ split_index = int(total_days * 0.2)
 train_data = df_daily_stats.iloc[:split_index]
 test_data = df_daily_stats.iloc[split_index:]
 
-# 4. Show summary of train and test data
+# Step 4: Data split completed
 print(f"Step 4: Data split completed.")
 print(f"\nTraining Data Summary:")
 print(train_data.describe())
@@ -113,52 +120,51 @@ input("Press Enter to continue...")
 
 # Train GMM model on train data
 scaler = StandardScaler()
-train_scaled = scaler.fit_transform(train_data)  # Use all columns for fitting
+train_scaled = scaler.fit_transform(train_data)
 
-gmm = GaussianMixture(n_components=2, random_state=42)  # Adjust components if necessary
+gmm = GaussianMixture(n_components=2, random_state=42)
 gmm.fit(train_scaled)
 
-# 5. Print relevant GMM details
+# Step 5: GMM model training completed
 print("Step 5: GMM model training completed.")
 print("GMM Converged:", gmm.converged_)
 print("Means:", gmm.means_)
 print("Covariances:", gmm.covariances_)
 input("Press Enter to continue...")
 
-
+# Function to detect anomaly
 def detect_anomaly(data_point, gmm_model, scaler, feature_names):
-    # Convert the data_point into a DataFrame with appropriate column names
     data_point_df = pd.DataFrame([data_point], columns=feature_names)
     scaled_point = scaler.transform(data_point_df)
     score = gmm_model.score_samples(scaled_point)
     return score[0]
 
-
 recent_scores = []
-
 alert_triggered = False
 window_size = 5
-
-# Get feature names from training data
 feature_names = train_data.columns
 
-# Simulate real-time arrival of each day's data
+# Dynamically adjust anomaly threshold based on window statistics
+def dynamic_threshold(recent_scores, std_multiplier=3):
+    mean_score = np.mean(recent_scores)
+    std_dev = np.std(recent_scores)
+    return mean_score - (std_multiplier * std_dev)
+
+# Step 6: Simulate real-time anomaly detection
 for i in range(test_data.shape[0]):
-    day_data = test_data.iloc[i]  # Simulate getting one day's data
+    day_data = test_data.iloc[i]
     anomaly_score = detect_anomaly(day_data, gmm, scaler, feature_names)
 
-    # Maintain the sliding window of the last 14 days' scores
     if len(recent_scores) >= window_size:
-        recent_scores.pop(0)  # Remove the oldest score to keep only the last 14 days
+        recent_scores.pop(0)
     recent_scores.append(anomaly_score)
 
-    # Only start anomaly detection after we have 14 days of data
     if len(recent_scores) == window_size:
-        avg_recent_score = np.mean(recent_scores)
-
-        # Check if today's anomaly score is significantly lower (indicating an anomaly)
-        if anomaly_score < (avg_recent_score - 3):  # Adjust threshold as necessary
+        threshold = dynamic_threshold(recent_scores)
+        
+        if anomaly_score < threshold:  # Use dynamic threshold here
             print(f"Day {str(i).rjust(3)} : {test_data.index[i]} - Abnormal")
+            print(f"Explanation: Anomaly Score ({anomaly_score}) is below dynamic threshold ({threshold})")
             alert_triggered = True
 
 if not alert_triggered:
