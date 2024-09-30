@@ -21,7 +21,7 @@ input("Press Enter to continue...")
 
 # Convert time to decimal representation
 def time_to_decimal(t):
-    return t.hour + t.minute / 60
+    return round(t.hour + t.minute / 60, 2)
 
 
 # Identify night-time activities dynamically
@@ -43,28 +43,24 @@ def compute_daily_stats(x):
     # Count transitions from Sleeping to Bed_to_Toilet
     sleep_to_bed_to_toilet = ((x["activity"] == "Bed_to_Toilet") & (activity_shifted == "Sleeping")).sum()
 
-    # Time when the person went to sleep (considering night-time activities)
-    sleep_start_times = x[
-        (x["activity"] == "Sleeping") & (x["Is_Night"]) & (~activity_shifted.isin(["Sleeping", "Bed_to_Toilet"]))
-    ].index
-    if not sleep_start_times.empty:
-        sleep_start = time_to_decimal(sleep_start_times[0])
-    else:
-        sleep_start = None
+    # Determine the sleep start time using vectorized operations
+    sleep_start_indices = (x["activity"] == "Sleeping") & ~activity_shifted.isin(["Sleeping", "Bed_to_Toilet"])
+    sleep_start_time = None
+    if sleep_start_indices.any():
+        sleep_start_time = time_to_decimal(x.index[sleep_start_indices][0])  # Get first occurrence
 
-    # Time when the person woke up
-    wake_up_times = x[~x["activity"].isin(["Sleeping", "Bed_to_Toilet"]) & x["Is_Night"]].index
-    if not wake_up_times.empty:
-        wake_up = time_to_decimal(wake_up_times[0])
-    else:
-        wake_up = None
+    # Determine the wake-up time using vectorized operations
+    wake_up_indices = ~x["activity"].isin(["Sleeping", "Bed_to_Toilet"]) & (activity_shifted == "Sleeping")
+    wake_up_time = None
+    if wake_up_indices.any():
+        wake_up_time = time_to_decimal(x.index[wake_up_indices][0])  # Get first occurrence
 
     return pd.Series(
         {
             "sleep_count": (x["activity"] == "Sleeping").sum(),
             "sleep_disturbances": sleep_to_bed_to_toilet,
-            "sleep_start_time": sleep_start,
-            "wake_up_time": wake_up,
+            "sleep_start_time": sleep_start_time,
+            "wake_up_time": wake_up_time,
             "eating_count": (x["activity"] == "Eating").sum(),
             "meal_preparation_count": (x["activity"] == "Meal_Preparation").sum(),
         }
@@ -83,7 +79,6 @@ input("Press Enter to continue...")
 df_daily_stats = df_daily_stats.fillna(0)
 
 # Create combined features (sleep disturbances + early wake-up, eating and sleep disturbances, etc.)
-df_daily_stats["sleep_drift"] = df_daily_stats["wake_up_time"].diff().fillna(0)
 
 # Add sliding window features (e.g., 5-day rolling mean)
 df_daily_stats["rolling_sleep_count"] = df_daily_stats["sleep_count"].rolling(window=5).mean().fillna(0)
@@ -96,9 +91,9 @@ def perform_normalcy_test(data, column):
     print(f"Normalcy test for {column}:")
     print(f"  Statistics = {stat}, p-value = {p}")
     if p > 0.05:
-        print("  Data looks normal (fail to reject H0)")
+        print("  Data looks normal (fail to reject H0)\n\n")
     else:
-        print("  Data does not look normal (reject H0)")
+        print("  Data does not look normal (reject H0)\n\n")
 
 
 # Step 3: Perform normalcy test and show outputs for each column and combination
@@ -108,7 +103,7 @@ for col in df_daily_stats.columns:
     perform_normalcy_test(df_daily_stats[col], col)
 
 # Test combinations of columns
-combo_cols = ["sleep_count", "sleep_disturbances", "eating_count", "meal_preparation_count", "sleep_drift"]
+combo_cols = ["sleep_count", "sleep_disturbances", "eating_count", "meal_preparation_count"]
 combo_data = df_daily_stats[combo_cols].dropna()
 perform_normalcy_test(combo_data.sum(axis=1), "combined_columns_sum")
 
@@ -124,9 +119,9 @@ test_data = df_daily_stats.iloc[split_index:]
 # Step 4: Data split completed
 print(f"Step 4: Data split completed.")
 print(f"\nTraining Data Summary:")
-print(train_data.describe())
+print(train_data.head())
 print(f"\nTesting Data Summary:")
-print(test_data.describe())
+print(test_data.head())
 input("Press Enter to continue...")
 
 # Train GMM model on train data
