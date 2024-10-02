@@ -42,6 +42,8 @@ def compute_daily_stats(x):
 
     # Count transitions from Sleeping to Bed_to_Toilet
     sleep_to_bed_to_toilet = ((x["activity"] == "Bed_to_Toilet") & (activity_shifted == "Sleeping")).sum()
+    eating_count = ((x["activity"] == "Eating") & (activity_shifted != "Eating")).sum()
+    cooking_count = ((x["activity"] == "Meal_Preparation") & (activity_shifted != "Meal_Preparation")).sum()
 
     # Determine the sleep start time using vectorized operations
     sleep_start_indices = (x["activity"] == "Sleeping") & ~activity_shifted.isin(["Sleeping", "Bed_to_Toilet"])
@@ -57,12 +59,13 @@ def compute_daily_stats(x):
 
     return pd.Series(
         {
-            "sleep_count": (x["activity"] == "Sleeping").sum(),
+            "sleep_duration": (x["activity"] == "Sleeping").sum() / 60,
             "sleep_disturbances": sleep_to_bed_to_toilet,
             "sleep_start_time": sleep_start_time,
             "wake_up_time": wake_up_time,
-            "eating_count": (x["activity"] == "Eating").sum(),
-            "meal_preparation_count": (x["activity"] == "Meal_Preparation").sum(),
+            "eating_count": eating_count,
+            "cooking_count": cooking_count,
+            "active_duration": (x["activity"].isin(["Meal_Preparation", "Wash_Dishes", "Housekeeping"])).sum() / 60,
         }
     )
 
@@ -77,12 +80,6 @@ input("Press Enter to continue...")
 
 # Handle missing data by filling with zeros
 df_daily_stats = df_daily_stats.fillna(0)
-
-# Create combined features (sleep disturbances + early wake-up, eating and sleep disturbances, etc.)
-
-# Add sliding window features (e.g., 5-day rolling mean)
-df_daily_stats["rolling_sleep_count"] = df_daily_stats["sleep_count"].rolling(window=5).mean().fillna(0)
-df_daily_stats["rolling_sleep_disturbances"] = df_daily_stats["sleep_disturbances"].rolling(window=5).mean().fillna(0)
 
 
 # Normalcy Test on Each Column
@@ -103,7 +100,7 @@ for col in df_daily_stats.columns:
     perform_normalcy_test(df_daily_stats[col], col)
 
 # Test combinations of columns
-combo_cols = ["sleep_count", "sleep_disturbances", "eating_count", "meal_preparation_count"]
+combo_cols = ["sleep_duration", "sleep_disturbances", "eating_count", "cooking_count"]
 combo_data = df_daily_stats[combo_cols].dropna()
 perform_normalcy_test(combo_data.sum(axis=1), "combined_columns_sum")
 
@@ -160,6 +157,7 @@ def dynamic_threshold(recent_scores):
     return mean_score - std_dev
 
 
+print("\n\n")
 generalised_monitoring = GeneralisedMonitoring()
 # Step 6: Simulate real-time anomaly detection
 for i in range(test_data.shape[0]):
@@ -176,9 +174,19 @@ for i in range(test_data.shape[0]):
         if anomaly_score < threshold:  # Use dynamic threshold here
             print(f"Day {str(i).rjust(3)} : {test_data.index[i]} - Abnormal")
             risks_analysis = generalised_monitoring.highlight_risks(day_data)
-            pprint(risks_analysis)
+            scores = generalised_monitoring.get_scores(day_data)
+            alerts = []
+            for feature in scores.keys():
+                if feature in risks_analysis.keys() and scores[feature] <= 0.5:
+                    alerts.append(
+                        f"----  {feature.ljust(20)} Value: {str(day_data[feature]).ljust(10)} Score : {str(int(scores[feature] * 10)).ljust(10)} {risks_analysis[feature]}"
+                    )
+            if len(alerts) == 0:
+                print("----  [NORMAL] Generalised Scores are Normal")
+            else:
+                for alert in alerts:
+                    print(alert)
             print("\n\n")
-            # print(f"Explanation: Anomaly Score ({anomaly_score}) is below dynamic threshold ({threshold})")
             alert_triggered = True
 
 if not alert_triggered:

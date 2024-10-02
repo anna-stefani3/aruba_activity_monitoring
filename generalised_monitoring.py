@@ -4,27 +4,84 @@ class GeneralisedMonitoring:
         Initialize the monitor with optional custom thresholds for each activity.
         Default thresholds are defined if not provided.
         """
+        self.question_1 = "Do You Sleep well?"
+        self.question_2 = "Does the person experience problems with sleeping?"
+        self.question_3 = "What is person's general level of activity during the day?"
+        self.question_4 = "Does the person have poor personal hygiene?"
+        self.question_5 = "Does the person fail to eat a healthy diet?"
+        self.question_6 = "Does the person's day lack structure?"
+
         self.thresholds = {
-            "sleep_min": 240,  # 4 hours in minutes
-            "sleep_max": 720,  # 12 hours in minutes
+            "sleep_min": 6,
+            "sleep_max": 10,
             "sleep_disturbances_max": 3,
             "eating_min": 1,
             "eating_max": 6,
-            "meal_prep_min": 1,
+            "cooking_min": 1,
             "wake_up_min": 5,  # 5 AM
             "wake_up_max": 10,  # 10 AM
-            "sleep_start_min": 21,  # 9 PM
-            "sleep_start_max": 2,  # 2 AM
+            "sleep_start_min": 19,  # 7 PM
+            "sleep_start_max": 1,  # 1 AM
+        }
+        self.LOWER_UPPER_LIMIT = {
+            "sleep_duration": (0, 24),
+            "sleep_disturbances": (0, 5),
+            "sleep_start_time": (0, 24),
+            "wake_up_time": (0, 24),
+            "eating_count": (0, 5),
+            "cooking_count": (0, 5),
+            "active_duration": (0, 24),
         }
 
-    def check_sleep_duration(self, sleep_minutes):
+        self.PERFECT_RANGES = {
+            "sleep_duration": (6, 10),
+            "sleep_disturbances": (0, 1),
+            "sleep_start_time": (21, 22),
+            "wake_up_time": (5, 6),
+            "eating_count": (2, 2),
+            "cooking_count": (2, 2),
+            "active_duration": (3, 4),
+        }
+
+        self.QUESTIONS_MAPPING = {
+            "sleep_duration": (self.question_1, self.question_2),
+            "sleep_disturbances": (self.question_1, self.question_2),
+            "sleep_start_time": (self.question_1, self.question_2),
+            "wake_up_time": (self.question_1, self.question_2),
+            "eating_count": (self.question_5,),
+            "cooking_count": (self.question_5,),
+            "active_duration": (self.question_3,),
+        }
+
+    def calculate_score(self, feature, value):
+        lower_limit, upper_limit = self.LOWER_UPPER_LIMIT[feature]
+        lower, upper = self.PERFECT_RANGES[feature]
+        # If value is within the [lower, upper] range, score is 1
+        value = float(value)
+        if lower <= value <= upper:
+            return 1.0
+
+        # If value is below the lower range
+        if lower_limit <= value < lower:
+            slope = 1 / (lower - lower_limit)  # Slope from lower_limit to lower
+            return round(slope * (value - lower_limit), 1)
+
+        # If value is above the upper range
+        if upper < value <= upper_limit:
+            slope = 1 / (upper_limit - upper)  # Slope from upper to upper_limit
+            return round(1 - slope * (value - upper), 1)
+
+        # If value is outside [lower_limit, upper_limit], return 0
+        return 0.0
+
+    def check_sleep_duration(self, sleep_duration):
         """
         Check if sleep duration is within normal human range (4-12 hours).
         """
-        if sleep_minutes < self.thresholds["sleep_min"]:
-            return "Sleep Deprivation (Under 4 Hours)"
-        elif sleep_minutes > self.thresholds["sleep_max"]:
-            return "Oversleeping (More than 12 Hours)"
+        if sleep_duration < self.thresholds["sleep_min"]:
+            return f"Sleep Deprivation ({round(sleep_duration,1)} Hours)"
+        elif sleep_duration > self.thresholds["sleep_max"]:
+            return f"Oversleeping ({round(sleep_duration,1)} Hours)"
         return "Normal Sleep Range"
 
     def check_sleep_disturbances(self, sleep_disturbances):
@@ -49,9 +106,9 @@ class GeneralisedMonitoring:
         """
         Check if meal preparation events are happening regularly.
         """
-        if meal_preparation_count < self.thresholds["meal_prep_min"]:
-            return "No Meal Preparation Detected"
-        return "Normal Meal Preparation"
+        if meal_preparation_count < self.thresholds["cooking_min"]:
+            return "No Cooking Detected"
+        return "Cooking Normally"
 
     def check_wake_up_time(self, wake_up_time):
         """
@@ -65,13 +122,13 @@ class GeneralisedMonitoring:
 
     def check_sleep_start_time(self, sleep_start_time):
         """
-        Check if the sleep start time is within a reasonable range (e.g., 9 PM - 2 AM).
+        Check if the sleep start time is within a reasonable range (e.g., 7 PM - 1 AM).
         """
         if sleep_start_time is not None:
-            if sleep_start_time < self.thresholds["sleep_start_min"] and sleep_start_time >= 0:
-                return "Abnormal Early Sleep Time (Before 9 PM)"
-            elif sleep_start_time > self.thresholds["sleep_start_max"]:
-                return "Abnormal Late Sleep Time (After 2 AM)"
+            if sleep_start_time < self.thresholds["sleep_start_min"] and sleep_start_time >= 12:
+                return "Abnormal Early Sleep Time (Before 7 PM)"
+            elif sleep_start_time > self.thresholds["sleep_start_max"] and sleep_start_time < 12:
+                return "Sleeping Late Sleep Time (After 1 AM)"
             return "Normal Sleep Start Time"
         return "Sleep Start Time Not Available"
 
@@ -82,31 +139,43 @@ class GeneralisedMonitoring:
         day_result = {}
 
         # Apply each rule-based check
-        sleep_check = self.check_sleep_duration(day_data["sleep_count"])
+        sleep_check = self.check_sleep_duration(day_data["sleep_duration"])
         if "Deprivation" in sleep_check or "Oversleeping" in sleep_check:
-            day_result["Sleep Check"] = sleep_check
+            day_result["sleep_duration"] = sleep_check
 
         sleep_disturbance_check = self.check_sleep_disturbances(day_data["sleep_disturbances"])
         if "Poor Sleep Quality" in sleep_disturbance_check:
-            day_result["Sleep Disturbance Check"] = sleep_disturbance_check
+            day_result["sleep_disturbances"] = sleep_disturbance_check
 
         eating_check = self.check_eating_events(day_data["eating_count"])
         if "No Eating Events" in eating_check or "Excessive Eating" in eating_check:
-            day_result["Eating Check"] = eating_check
+            day_result["eating_count"] = eating_check
 
-        meal_preparation_check = self.check_meal_preparation(day_data["meal_preparation_count"])
+        meal_preparation_check = self.check_meal_preparation(day_data["cooking_count"])
         if "No Meal Preparation" in meal_preparation_check:
-            day_result["Meal Preparation Check"] = meal_preparation_check
+            day_result["cooking_count"] = meal_preparation_check
 
         wake_up_check = self.check_wake_up_time(day_data["wake_up_time"])
         if "Abnormal" in wake_up_check:
-            day_result["Wake-up Check"] = wake_up_check
+            day_result["wake_up_time"] = wake_up_check
 
         sleep_start_time_check = self.check_sleep_start_time(day_data["sleep_start_time"])
         if "Abnormal" in sleep_start_time_check:
-            day_result["Sleep Start Time Check"] = sleep_start_time_check
+            day_result["sleep_start_time"] = sleep_start_time_check
 
         return day_result
+
+    def get_scores(self, day_data):
+        scores = {}
+        scores["sleep_duration"] = self.calculate_score("sleep_duration", day_data["sleep_duration"])
+        scores["sleep_disturbances"] = self.calculate_score("sleep_disturbances", day_data["sleep_disturbances"])
+        scores["sleep_start_time"] = self.calculate_score("sleep_start_time", day_data["sleep_start_time"])
+        scores["wake_up_time"] = self.calculate_score("wake_up_time", day_data["wake_up_time"])
+        scores["eating_count"] = self.calculate_score("eating_count", day_data["eating_count"])
+        scores["cooking_count"] = self.calculate_score("cooking_count", day_data["cooking_count"])
+        scores["active_duration"] = self.calculate_score("active_duration", day_data["active_duration"])
+
+        return scores
 
 
 # # Usage of RuleBasedMonitor for real-time simulation
