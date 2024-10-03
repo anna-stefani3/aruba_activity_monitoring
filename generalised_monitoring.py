@@ -53,6 +53,24 @@ class GeneralisedMonitoring:
             "active_duration": (self.question_3,),
         }
 
+        self.SCORING_TYPE = {
+            self.question_1: "direct",
+            self.question_2: "inverse",
+            self.question_3: "direct",
+            self.question_4: "direct",
+            self.question_5: "direct",
+            self.question_6: "inverse",
+        }
+
+        self.FEATURE_WEIGHTS_MAPPING = {
+            self.question_1: {"sleep_duration": 0.5, "sleep_disturbances": 0.5},
+            self.question_2: {"sleep_disturbances": 1},
+            # self.question_3: {},
+            # self.question_4: {},
+            self.question_5: {"eating_count": 0.8, "cooking_count": 0.2},
+            # self.question_6: {},
+        }
+
     def calculate_score(self, feature, value):
         lower_limit, upper_limit = self.LOWER_UPPER_LIMIT[feature]
         lower, upper = self.PERFECT_RANGES[feature]
@@ -73,6 +91,15 @@ class GeneralisedMonitoring:
 
         # If value is outside [lower_limit, upper_limit], return 0
         return 0.0
+
+    def get_egrist_score(self, question, scores_dict):
+        score = 0
+        for feature in self.FEATURE_WEIGHTS_MAPPING[question].keys():
+            if self.SCORING_TYPE[question] == "direct":
+                score += scores_dict[feature] * self.FEATURE_WEIGHTS_MAPPING[question][feature]
+            else:
+                score += 1 - scores_dict[feature] * self.FEATURE_WEIGHTS_MAPPING[question][feature]
+        return score
 
     def check_sleep_duration(self, sleep_duration):
         """
@@ -176,6 +203,13 @@ class GeneralisedMonitoring:
         scores["active_duration"] = self.calculate_score("active_duration", day_data["active_duration"])
 
         return scores
+
+    def get_questions_scores(self, scores_dict):
+        egrist_scores = {}
+        for question in self.FEATURE_WEIGHTS_MAPPING.keys():
+            score = self.get_egrist_score(question, scores_dict)
+            egrist_scores[question] = score
+        return egrist_scores
 
 
 # # Usage of RuleBasedMonitor for real-time simulation

@@ -175,6 +175,7 @@ for i in range(test_data.shape[0]):
             print(f"Day {str(i).rjust(3)} : {test_data.index[i]} - Abnormal")
             risks_analysis = generalised_monitoring.highlight_risks(day_data)
             scores = generalised_monitoring.get_scores(day_data)
+            grist_scores_dict = generalised_monitoring.get_questions_scores(scores)
             alerts = []
             for feature in scores.keys():
                 if feature in risks_analysis.keys() and scores[feature] <= 0.5:
@@ -186,6 +187,10 @@ for i in range(test_data.shape[0]):
             else:
                 for alert in alerts:
                     print(alert)
+
+            for question in grist_scores_dict:
+                print(f"SCORE: {str(int(grist_scores_dict[question] * 10)).ljust(5)} QUESTION: {question}")
+
             print("\n\n")
             alert_triggered = True
 
