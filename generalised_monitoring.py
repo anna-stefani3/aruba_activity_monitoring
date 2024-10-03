@@ -24,17 +24,17 @@ class GeneralisedMonitoring:
             "sleep_start_max": 1,  # 1 AM
         }
         self.LOWER_UPPER_LIMIT = {
-            "sleep_duration": (0, 24),
+            "sleep_duration": (4, 15),
             "sleep_disturbances": (0, 5),
-            "sleep_start_time": (0, 24),
-            "wake_up_time": (0, 24),
+            "sleep_start_time": (0, 3),
+            "wake_up_time": (1, 14),
             "eating_count": (0, 5),
             "cooking_count": (0, 5),
-            "active_duration": (0, 24),
+            "active_duration": (0, 16),
         }
 
         self.PERFECT_RANGES = {
-            "sleep_duration": (6, 10),
+            "sleep_duration": (7, 8),
             "sleep_disturbances": (0, 1),
             "sleep_start_time": (21, 22),
             "wake_up_time": (5, 6),
@@ -58,10 +58,10 @@ class GeneralisedMonitoring:
             self.question_2: "inverse",
             self.question_3: "direct",
             self.question_4: "direct",
-            self.question_5: "direct",
+            self.question_5: "inverse",
             self.question_6: "inverse",
         }
-
+        # score = w1*f1 + w2*f2 + .... + wn*fn
         self.FEATURE_WEIGHTS_MAPPING = {
             self.question_1: {"sleep_duration": 0.5, "sleep_disturbances": 0.5},
             self.question_2: {"sleep_disturbances": 1},
@@ -80,6 +80,8 @@ class GeneralisedMonitoring:
             return 1.0
 
         # If value is below the lower range
+        # y = mx + c where c is = 0
+        # we only need y = mx
         if lower_limit <= value < lower:
             slope = 1 / (lower - lower_limit)  # Slope from lower_limit to lower
             return round(slope * (value - lower_limit), 1)
@@ -98,7 +100,7 @@ class GeneralisedMonitoring:
             if self.SCORING_TYPE[question] == "direct":
                 score += scores_dict[feature] * self.FEATURE_WEIGHTS_MAPPING[question][feature]
             else:
-                score += 1 - scores_dict[feature] * self.FEATURE_WEIGHTS_MAPPING[question][feature]
+                score += (1 - scores_dict[feature]) * self.FEATURE_WEIGHTS_MAPPING[question][feature]
         return score
 
     def check_sleep_duration(self, sleep_duration):

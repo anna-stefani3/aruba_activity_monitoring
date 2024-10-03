@@ -187,7 +187,6 @@ for i in range(test_data.shape[0]):
             else:
                 for alert in alerts:
                     print(alert)
-
             for question in grist_scores_dict:
                 print(f"SCORE: {str(int(grist_scores_dict[question] * 10)).ljust(5)} QUESTION: {question}")
 
