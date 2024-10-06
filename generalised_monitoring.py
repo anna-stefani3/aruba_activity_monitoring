@@ -11,218 +11,93 @@ class GeneralisedMonitoring:
         self.question_5 = "Does the person fail to eat a healthy diet?"
         self.question_6 = "Does the person's day lack structure?"
 
-        self.thresholds = {
-            "sleep_min": 6,
-            "sleep_max": 10,
-            "sleep_disturbances_max": 3,
-            "eating_min": 1,
-            "eating_max": 6,
-            "cooking_min": 1,
-            "wake_up_min": 5,  # 5 AM
-            "wake_up_max": 10,  # 10 AM
-            "sleep_start_min": 19,  # 7 PM
-            "sleep_start_max": 1,  # 1 AM
-        }
-        self.LOWER_UPPER_LIMIT = {
-            "sleep_duration": (4, 15),
-            "sleep_disturbances": (0, 5),
-            "sleep_start_time": (0, 3),
-            "wake_up_time": (1, 14),
-            "eating_count": (0, 5),
-            "cooking_count": (0, 5),
-            "active_duration": (0, 16),
-        }
-
-        self.PERFECT_RANGES = {
-            "sleep_duration": (7, 8),
-            "sleep_disturbances": (0, 1),
-            "sleep_start_time": (21, 22),
-            "wake_up_time": (5, 6),
-            "eating_count": (2, 2),
-            "cooking_count": (2, 2),
-            "active_duration": (3, 4),
-        }
-
-        self.QUESTIONS_MAPPING = {
-            "sleep_duration": (self.question_1, self.question_2),
-            "sleep_disturbances": (self.question_1, self.question_2),
-            "sleep_start_time": (self.question_1, self.question_2),
-            "wake_up_time": (self.question_1, self.question_2),
-            "eating_count": (self.question_5,),
-            "cooking_count": (self.question_5,),
-            "active_duration": (self.question_3,),
-        }
-
-        self.SCORING_TYPE = {
-            self.question_1: "direct",
-            self.question_2: "inverse",
-            self.question_3: "direct",
-            self.question_4: "direct",
-            self.question_5: "inverse",
-            self.question_6: "inverse",
-        }
-        # score = w1*f1 + w2*f2 + .... + wn*fn
-        self.FEATURE_WEIGHTS_MAPPING = {
-            self.question_1: {"sleep_duration": 0.5, "sleep_disturbances": 0.5},
-            self.question_2: {"sleep_disturbances": 1},
+        self.FEATURE_MAPPING = {
+            self.question_1: ("sleep_duration", "sleep_disturbances"),
+            self.question_2: ("sleep_disturbances",),
             # self.question_3: {},
             # self.question_4: {},
-            self.question_5: {"eating_count": 0.8, "cooking_count": 0.2},
+            self.question_5: ("eating_count", "cooking_count"),
             # self.question_6: {},
         }
 
-    def calculate_score(self, feature, value):
-        lower_limit, upper_limit = self.LOWER_UPPER_LIMIT[feature]
-        lower, upper = self.PERFECT_RANGES[feature]
-        # If value is within the [lower, upper] range, score is 1
-        value = float(value)
-        if lower <= value <= upper:
-            return 1.0
+    def get_score_quality(self, score):
+        if score <= 3:
+            quality_range = "Poor"
+        elif score <= 7:
+            quality_range = "Normal"
+        elif score <= 9:
+            quality_range = "Good"
+        else:
+            quality_range = "Excellent"
+        return quality_range
 
-        # If value is below the lower range
-        # y = mx + c where c is = 0
-        # we only need y = mx
-        if lower_limit <= value < lower:
-            slope = 1 / (lower - lower_limit)  # Slope from lower_limit to lower
-            return round(slope * (value - lower_limit), 1)
+    def get_sleep_duration_score(self, sleep_duration: float) -> tuple[int, str]:
+        if sleep_duration <= 3:
+            score = 3  # Extreme insufficient sleep
+        elif 3 < sleep_duration <= 6:
+            score = 7  # Insufficient sleep
+        elif 6 < sleep_duration <= 10:
+            score = 10  # Normal sleep
+        elif 10 < sleep_duration <= 14:
+            score = 7  # Oversleeping
+        else:
+            score = 3  # Extreme oversleeping
 
-        # If value is above the upper range
-        if upper < value <= upper_limit:
-            slope = 1 / (upper_limit - upper)  # Slope from upper to upper_limit
-            return round(1 - slope * (value - upper), 1)
+        quality_range = self.get_score_quality(score)
+        return score, quality_range
 
-        # If value is outside [lower_limit, upper_limit], return 0
-        return 0.0
+    def get_sleep_disturbance_score(self, sleep_disturbances):
+        if sleep_disturbances <= 2:
+            score = 10
+        elif sleep_disturbances <= 5:
+            score = 5
+        else:
+            score = 0
+        quality_range = self.get_score_quality(score)
+        return score, quality_range
 
-    def get_egrist_score(self, question, scores_dict):
+    def get_eating_count_score(self, eating_count: float) -> tuple[int, str]:
+        if eating_count == 0:
+            score = 0  # No Food taken
+        elif eating_count == 1:
+            score = 5  # Bare Minimum food Taken
+        elif eating_count == 2:
+            score = 8  # Normal Eating
+        elif eating_count == 3:
+            score = 10  # Perfect Eating
+        elif eating_count == 4:
+            score = 7  # Slight Over eating
+        elif eating_count == 5:
+            score = 4  # Over eating
+        else:
+            score = 1  # Extreme Over-eating
+
+        quality_range = self.get_score_quality(score)
+        return score, quality_range
+
+    def get_cooking_count_score(self, cooking_count: float) -> tuple[int, str]:
+        if cooking_count == 0:
+            score = 0  # No Food cooked
+        elif cooking_count == 1:
+            score = 5  # Bare Minimum food cooked
+        elif cooking_count == 2:
+            score = 8  # Normal cooking
+        elif cooking_count == 3:
+            score = 10  # Perfect cooking
+        elif cooking_count == 4:
+            score = 7  # Slight Over cooking
+        elif cooking_count == 5:
+            score = 4  # Over cooking
+        else:
+            score = 1  # Extreme Over-cooking
+
+        quality_range = self.get_score_quality(score)
+        return score, quality_range
+
+    def get_egrist_score(self, question, scores_dict) -> int:
         score = 0
-        for feature in self.FEATURE_WEIGHTS_MAPPING[question].keys():
-            if self.SCORING_TYPE[question] == "direct":
-                score += scores_dict[feature] * self.FEATURE_WEIGHTS_MAPPING[question][feature]
-            else:
-                score += (1 - scores_dict[feature]) * self.FEATURE_WEIGHTS_MAPPING[question][feature]
-        return score
+        features_count = len(self.FEATURE_MAPPING[question])
+        for feature in self.FEATURE_MAPPING[question]:
+            score += scores_dict[feature]
 
-    def check_sleep_duration(self, sleep_duration):
-        """
-        Check if sleep duration is within normal human range (4-12 hours).
-        """
-        if sleep_duration < self.thresholds["sleep_min"]:
-            return f"Sleep Deprivation ({round(sleep_duration,1)} Hours)"
-        elif sleep_duration > self.thresholds["sleep_max"]:
-            return f"Oversleeping ({round(sleep_duration,1)} Hours)"
-        return "Normal Sleep Range"
-
-    def check_sleep_disturbances(self, sleep_disturbances):
-        """
-        Check if sleep disturbances are higher than expected (e.g., more than 3 disturbances).
-        """
-        if sleep_disturbances > self.thresholds["sleep_disturbances_max"]:
-            return "Poor Sleep Quality (More than 3 disturbances)"
-        return "Normal Sleep Quality"
-
-    def check_eating_events(self, eating_count):
-        """
-        Check if the number of eating events is within the normal range.
-        """
-        if eating_count < self.thresholds["eating_min"]:
-            return "No Eating Events Detected (Possible missed meals)"
-        elif eating_count > self.thresholds["eating_max"]:
-            return "Excessive Eating Events (More than 6)"
-        return "Normal Eating Pattern"
-
-    def check_meal_preparation(self, meal_preparation_count):
-        """
-        Check if meal preparation events are happening regularly.
-        """
-        if meal_preparation_count < self.thresholds["cooking_min"]:
-            return "No Cooking Detected"
-        return "Cooking Normally"
-
-    def check_wake_up_time(self, wake_up_time):
-        """
-        Check if the wake-up time is within a reasonable range (e.g., 5 AM - 10 AM).
-        """
-        if wake_up_time is not None:
-            if wake_up_time < self.thresholds["wake_up_min"] or wake_up_time > self.thresholds["wake_up_max"]:
-                return "Abnormal Wake-up Time (Outside 5 AM to 10 AM)"
-            return "Normal Wake-up Time"
-        return "Wake-up Time Not Available"
-
-    def check_sleep_start_time(self, sleep_start_time):
-        """
-        Check if the sleep start time is within a reasonable range (e.g., 7 PM - 1 AM).
-        """
-        if sleep_start_time is not None:
-            if sleep_start_time < self.thresholds["sleep_start_min"] and sleep_start_time >= 12:
-                return "Abnormal Early Sleep Time (Before 7 PM)"
-            elif sleep_start_time > self.thresholds["sleep_start_max"] and sleep_start_time < 12:
-                return "Sleeping Late Sleep Time (After 1 AM)"
-            return "Normal Sleep Start Time"
-        return "Sleep Start Time Not Available"
-
-    def highlight_risks(self, day_data):
-        """
-        Apply rule-based checks to a single day's data and return only those with risks.
-        """
-        day_result = {}
-
-        # Apply each rule-based check
-        sleep_check = self.check_sleep_duration(day_data["sleep_duration"])
-        if "Deprivation" in sleep_check or "Oversleeping" in sleep_check:
-            day_result["sleep_duration"] = sleep_check
-
-        sleep_disturbance_check = self.check_sleep_disturbances(day_data["sleep_disturbances"])
-        if "Poor Sleep Quality" in sleep_disturbance_check:
-            day_result["sleep_disturbances"] = sleep_disturbance_check
-
-        eating_check = self.check_eating_events(day_data["eating_count"])
-        if "No Eating Events" in eating_check or "Excessive Eating" in eating_check:
-            day_result["eating_count"] = eating_check
-
-        meal_preparation_check = self.check_meal_preparation(day_data["cooking_count"])
-        if "No Meal Preparation" in meal_preparation_check:
-            day_result["cooking_count"] = meal_preparation_check
-
-        wake_up_check = self.check_wake_up_time(day_data["wake_up_time"])
-        if "Abnormal" in wake_up_check:
-            day_result["wake_up_time"] = wake_up_check
-
-        sleep_start_time_check = self.check_sleep_start_time(day_data["sleep_start_time"])
-        if "Abnormal" in sleep_start_time_check:
-            day_result["sleep_start_time"] = sleep_start_time_check
-
-        return day_result
-
-    def get_scores(self, day_data):
-        scores = {}
-        scores["sleep_duration"] = self.calculate_score("sleep_duration", day_data["sleep_duration"])
-        scores["sleep_disturbances"] = self.calculate_score("sleep_disturbances", day_data["sleep_disturbances"])
-        scores["sleep_start_time"] = self.calculate_score("sleep_start_time", day_data["sleep_start_time"])
-        scores["wake_up_time"] = self.calculate_score("wake_up_time", day_data["wake_up_time"])
-        scores["eating_count"] = self.calculate_score("eating_count", day_data["eating_count"])
-        scores["cooking_count"] = self.calculate_score("cooking_count", day_data["cooking_count"])
-        scores["active_duration"] = self.calculate_score("active_duration", day_data["active_duration"])
-
-        return scores
-
-    def get_questions_scores(self, scores_dict):
-        egrist_scores = {}
-        for question in self.FEATURE_WEIGHTS_MAPPING.keys():
-            score = self.get_egrist_score(question, scores_dict)
-            egrist_scores[question] = score
-        return egrist_scores
-
-
-# # Usage of RuleBasedMonitor for real-time simulation
-# rule_monitor = GeneralisedMonitoring()
-
-# # Simulate processing one row (one day) at a time
-# for idx, row in df_daily_stats.iterrows():
-#     print(f"Monitoring for Date: {idx}")
-#     daily_report = rule_monitor.monitor_one_day(row)
-
-#     # Display issues for the current day
-#     for key, value in daily_report.items():
-#         print(f"{key}: {value}")
-#     print("\n")
+        return score // features_count  # returns average score

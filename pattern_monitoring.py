@@ -122,17 +122,22 @@ print(test_data.head())
 input("Press Enter to continue...")
 
 # Train GMM model on train data
-scaler = StandardScaler()
-train_scaled = scaler.fit_transform(train_data)
+sleeping_features = ["sleep_duration", "sleep_disturbances"]
+eating_features = ["eating_count", "cooking_count"]
 
-gmm = GaussianMixture(n_components=2, random_state=42)
-gmm.fit(train_scaled)
+sleeping_scaler = StandardScaler()
+sleeping_trained_scaled = sleeping_scaler.fit_transform(train_data[sleeping_features])
+
+eating_scaler = StandardScaler()
+eating_trained_scaled = eating_scaler.fit_transform(train_data[eating_features])
+
+sleeping_gmm = GaussianMixture(n_components=2, random_state=42)
+sleeping_gmm.fit(sleeping_trained_scaled)
+eating_gmm = GaussianMixture(n_components=2, random_state=42)
+eating_gmm.fit(eating_trained_scaled)
 
 # Step 5: GMM model training completed
 print("Step 5: GMM model training completed.")
-print("GMM Converged:", gmm.converged_)
-print("Means:", gmm.means_)
-print("Covariances:", gmm.covariances_)
 input("Press Enter to continue...")
 
 
@@ -144,7 +149,8 @@ def detect_anomaly(data_point, gmm_model, scaler, feature_names):
     return score[0]
 
 
-recent_scores = []
+recent_sleeping_anomaly_scores = []
+recent_eating_anomaly_scores = []
 alert_triggered = False
 window_size = 5
 feature_names = train_data.columns
@@ -162,33 +168,53 @@ generalised_monitoring = GeneralisedMonitoring()
 # Step 6: Simulate real-time anomaly detection
 for i in range(test_data.shape[0]):
     day_data = test_data.iloc[i]
-    anomaly_score = detect_anomaly(day_data, gmm, scaler, feature_names)
 
-    if len(recent_scores) >= window_size:
-        recent_scores.pop(0)
-    recent_scores.append(anomaly_score)
+    sleeping_anomaly_score = detect_anomaly(
+        day_data.loc[sleeping_features], sleeping_gmm, sleeping_scaler, feature_names=sleeping_features
+    )
+    eating_anomaly_score = detect_anomaly(
+        day_data.loc[eating_features], eating_gmm, eating_scaler, feature_names=eating_features
+    )
 
-    if len(recent_scores) == window_size:
-        threshold = dynamic_threshold(recent_scores)
+    if len(recent_sleeping_anomaly_scores) >= window_size:
+        recent_sleeping_anomaly_scores.pop(0)
+    if len(recent_eating_anomaly_scores) >= window_size:
+        recent_eating_anomaly_scores.pop(0)
+    recent_sleeping_anomaly_scores.append(sleeping_anomaly_score)
+    recent_eating_anomaly_scores.append(eating_anomaly_score)
 
-        if anomaly_score < threshold:  # Use dynamic threshold here
+    if len(recent_sleeping_anomaly_scores) == window_size:
+        threshold = dynamic_threshold(recent_sleeping_anomaly_scores)
+
+        if sleeping_anomaly_score < threshold:
             print(f"Day {str(i).rjust(3)} : {test_data.index[i]} - Abnormal")
-            risks_analysis = generalised_monitoring.highlight_risks(day_data)
-            scores = generalised_monitoring.get_scores(day_data)
-            grist_scores_dict = generalised_monitoring.get_questions_scores(scores)
-            alerts = []
-            for feature in scores.keys():
-                if feature in risks_analysis.keys() and scores[feature] <= 0.5:
-                    alerts.append(
-                        f"----  {feature.ljust(20)} Value: {str(day_data[feature]).ljust(10)} Score : {str(int(scores[feature] * 10)).ljust(10)} {risks_analysis[feature]}"
-                    )
-            if len(alerts) == 0:
-                print("----  [NORMAL] Generalised Scores are Normal")
-            else:
-                for alert in alerts:
-                    print(alert)
-            for question in grist_scores_dict:
-                print(f"SCORE: {str(int(grist_scores_dict[question] * 10)).ljust(5)} QUESTION: {question}")
+            sleep_duration_score, quality_range = generalised_monitoring.get_sleep_duration_score(
+                day_data[sleeping_features[0]]
+            )
+            sleep_disturbance_score, quality_range = generalised_monitoring.get_sleep_disturbance_score(
+                day_data[sleeping_features[1]]
+            )
+            scores = {sleeping_features[0]: sleep_duration_score, sleeping_features[1]: sleep_disturbance_score}
+            question_1_score = generalised_monitoring.get_egrist_score(generalised_monitoring.question_1, scores)
+            question_2_score = generalised_monitoring.get_egrist_score(generalised_monitoring.question_2, scores)
+            print("SLEEPING ANOMALY")
+            print(f"----  Question : {generalised_monitoring.question_1}    Score: {question_1_score}")
+            print(f"----  Question : {generalised_monitoring.question_2}    Score: {question_2_score}")
+
+            print("\n\n")
+            alert_triggered = True
+
+    if len(recent_eating_anomaly_scores) == window_size:
+        threshold = dynamic_threshold(recent_eating_anomaly_scores)
+
+        if eating_anomaly_score < threshold:
+            print(f"Day {str(i).rjust(3)} : {test_data.index[i]} - Abnormal")
+            eating_score, quality_range = generalised_monitoring.get_eating_count_score(day_data[eating_features[0]])
+            cooking_score, quality_range = generalised_monitoring.get_cooking_count_score(day_data[eating_features[1]])
+            scores = {eating_features[0]: eating_score, eating_features[1]: cooking_score}
+            question_5_score = generalised_monitoring.get_egrist_score(generalised_monitoring.question_5, scores)
+            print("EATING ANOMALY")
+            print(f"----  Question : {generalised_monitoring.question_5}    Score: {question_5_score}")
 
             print("\n\n")
             alert_triggered = True
