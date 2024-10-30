@@ -5,6 +5,12 @@ from scipy import stats
 import numpy as np
 from generalised_monitoring import GeneralisedMonitoring
 
+from data_injection import (
+    generate_synthetic_data_using_hmm,
+    inject_anomalies_continuous_days,
+    inject_anomalies_day_wise,
+)
+
 # Load Data
 file_path = "[ARUBA]-activities_fixed_interval_data.csv"
 df = pd.read_csv(file_path)
@@ -65,6 +71,10 @@ def compute_daily_stats(current_row):
 df_daily_stats = df.groupby(df.index.date).apply(compute_daily_stats)
 df_daily_stats.to_csv("daily_stats.csv", index=False)
 
+# NEW: Added 10 Times more Synthetic Data into original Data
+df_daily_stats = generate_synthetic_data_using_hmm(df_daily_stats)
+
+
 # Print summary of daily aggregated data
 print("Step 2: Date-wise aggregated data computed:")
 print(df_daily_stats.head())
@@ -112,9 +122,8 @@ perform_normalcy_test(combo_data.sum(axis=1), """["eating_count", "cooking_count
 
 input("Press Enter to continue...")
 
-# Split Data into 20%-80% ratio based on days
-total_days = df_daily_stats.shape[0]
-split_index = int(total_days * 0.2)
+# Split Data training has 2 Years data and rest into testing
+split_index = 730  # 2 years Data
 
 train_data = df_daily_stats.iloc[:split_index]
 test_data = df_daily_stats.iloc[split_index:]
@@ -141,6 +150,35 @@ sleeping_gmm = GaussianMixture(n_components=2, random_state=42)
 sleeping_gmm.fit(sleeping_trained_scaled)
 eating_gmm = GaussianMixture(n_components=2, random_state=42)
 eating_gmm.fit(eating_trained_scaled)
+
+# NEW :: Injecting Anomaly to testing data
+
+# Injecting Single Days
+injections_count = 300
+test_data = inject_anomalies_day_wise(train_data, test_data, sleeping_features, injections_count)
+test_data = inject_anomalies_day_wise(train_data, test_data, eating_features, injections_count)
+
+# Injecting Multiple Continous Days
+min_number_days = 2
+max_number_days = 30
+injections_count = 50
+inject_anomalies_continuous_days(
+    train_data,
+    test_data,
+    sleeping_features,
+    injections_count,
+    min_number_days,
+    max_number_days,
+)
+inject_anomalies_continuous_days(
+    train_data,
+    test_data,
+    eating_features,
+    injections_count,
+    min_number_days,
+    max_number_days,
+)
+
 
 # Step 5: GMM model training completed
 print("Step 5: GMM model training completed.")
