@@ -3,7 +3,6 @@ from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 from scipy import stats
 import numpy as np
-from pprint import pprint
 from generalised_monitoring import GeneralisedMonitoring
 
 # Load Data
@@ -24,58 +23,52 @@ def time_to_decimal(t):
     return round(t.hour + t.minute / 60, 2)
 
 
-# Identify night-time activities dynamically
-def classify_night_activities(df, start_hour=18, end_hour=4):
-    df["Hour"] = df.index.hour
-    # Classify night activities based on time boundaries
-    df["Is_Night"] = (df["Hour"] >= start_hour) | (df["Hour"] <= end_hour)
-    return df
-
-
-# Apply night-time activity classification
-df = classify_night_activities(df)
-
-
 # Define function to compute daily stats
-def compute_daily_stats(x):
-    activity_shifted = x["activity"].shift(1)
+def compute_daily_stats(current_row):
+    previous_activity = current_row["activity"].shift(1)
 
     # Count transitions from Sleeping to Bed_to_Toilet
-    sleep_to_bed_to_toilet = ((x["activity"] == "Bed_to_Toilet") & (activity_shifted == "Sleeping")).sum()
-    eating_count = ((x["activity"] == "Eating") & (activity_shifted != "Eating")).sum()
-    cooking_count = ((x["activity"] == "Meal_Preparation") & (activity_shifted != "Meal_Preparation")).sum()
+    sleep_to_bed_to_toilet = ((current_row["activity"] == "Bed_to_Toilet") & (previous_activity == "Sleeping")).sum()
+    eating_count = ((current_row["activity"] == "Eating") & (previous_activity != "Eating")).sum()
+    cooking_count = ((current_row["activity"] == "Meal_Preparation") & (previous_activity != "Meal_Preparation")).sum()
 
     # Determine the sleep start time using vectorized operations
-    sleep_start_indices = (x["activity"] == "Sleeping") & ~activity_shifted.isin(["Sleeping", "Bed_to_Toilet"])
+    sleep_start_indices = (current_row["activity"] == "Sleeping") & ~previous_activity.isin(
+        ["Sleeping", "Bed_to_Toilet"]
+    )
     sleep_start_time = None
     if sleep_start_indices.any():
-        sleep_start_time = time_to_decimal(x.index[sleep_start_indices][0])  # Get first occurrence
+        sleep_start_time = time_to_decimal(current_row.index[sleep_start_indices][0])  # Get first occurrence
 
     # Determine the wake-up time using vectorized operations
-    wake_up_indices = ~x["activity"].isin(["Sleeping", "Bed_to_Toilet"]) & (activity_shifted == "Sleeping")
+    wake_up_indices = ~current_row["activity"].isin(["Sleeping", "Bed_to_Toilet"]) & (previous_activity == "Sleeping")
     wake_up_time = None
     if wake_up_indices.any():
-        wake_up_time = time_to_decimal(x.index[wake_up_indices][0])  # Get first occurrence
+        wake_up_time = time_to_decimal(current_row.index[wake_up_indices][0])  # Get first occurrence
 
     return pd.Series(
         {
-            "sleep_duration": (x["activity"] == "Sleeping").sum() / 60,
+            "sleep_duration": round((current_row["activity"] == "Sleeping").sum() / 60, 2),
             "sleep_disturbances": sleep_to_bed_to_toilet,
             "sleep_start_time": sleep_start_time,
             "wake_up_time": wake_up_time,
             "eating_count": eating_count,
             "cooking_count": cooking_count,
-            "active_duration": (x["activity"].isin(["Meal_Preparation", "Wash_Dishes", "Housekeeping"])).sum() / 60,
+            "active_duration": round(
+                (current_row["activity"].isin(["Meal_Preparation", "Wash_Dishes", "Housekeeping"])).sum() / 60, 2
+            ),
         }
     )
 
 
 # Step 2: Compute daily stats for all activities
 df_daily_stats = df.groupby(df.index.date).apply(compute_daily_stats)
+df_daily_stats.to_csv("daily_stats.csv", index=False)
 
 # Print summary of daily aggregated data
 print("Step 2: Date-wise aggregated data computed:")
 print(df_daily_stats.head())
+print("Rows: ", df_daily_stats.shape[0], " Columns: ", df_daily_stats.shape[1])
 input("Press Enter to continue...")
 
 # Handle missing data by filling with zeros
@@ -102,7 +95,20 @@ for col in df_daily_stats.columns:
 # Test combinations of columns
 combo_cols = ["sleep_duration", "sleep_disturbances", "eating_count", "cooking_count"]
 combo_data = df_daily_stats[combo_cols].dropna()
-perform_normalcy_test(combo_data.sum(axis=1), "combined_columns_sum")
+perform_normalcy_test(
+    combo_data.sum(axis=1), """["sleep_duration", "sleep_disturbances", "eating_count", "cooking_count"]"""
+)
+
+# Test combinations of columns
+combo_cols = ["sleep_duration", "sleep_disturbances"]
+combo_data = df_daily_stats[combo_cols].dropna()
+perform_normalcy_test(combo_data.sum(axis=1), """["sleep_duration", "sleep_disturbances"]""")
+
+
+# Test combinations of columns
+combo_cols = ["eating_count", "cooking_count"]
+combo_data = df_daily_stats[combo_cols].dropna()
+perform_normalcy_test(combo_data.sum(axis=1), """["eating_count", "cooking_count"]""")
 
 input("Press Enter to continue...")
 
@@ -141,8 +147,8 @@ print("Step 5: GMM model training completed.")
 input("Press Enter to continue...")
 
 
-# Function to detect anomaly
-def detect_anomaly(data_point, gmm_model, scaler, feature_names):
+# Function to get_gmm_model_score
+def get_gmm_model_score(data_point, gmm_model, scaler, feature_names):
     data_point_df = pd.DataFrame([data_point], columns=feature_names)
     scaled_point = scaler.transform(data_point_df)
     score = gmm_model.score_samples(scaled_point)
@@ -169,10 +175,10 @@ generalised_monitoring = GeneralisedMonitoring()
 for i in range(test_data.shape[0]):
     day_data = test_data.iloc[i]
 
-    sleeping_anomaly_score = detect_anomaly(
+    sleeping_anomaly_score = get_gmm_model_score(
         day_data.loc[sleeping_features], sleeping_gmm, sleeping_scaler, feature_names=sleeping_features
     )
-    eating_anomaly_score = detect_anomaly(
+    eating_anomaly_score = get_gmm_model_score(
         day_data.loc[eating_features], eating_gmm, eating_scaler, feature_names=eating_features
     )
 
