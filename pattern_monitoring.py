@@ -152,16 +152,21 @@ eating_gmm = GaussianMixture(n_components=2, random_state=42)
 eating_gmm.fit(eating_trained_scaled)
 
 # NEW :: Injecting Anomaly to testing data
-
+print("\n\n")
+print("[START] Injection Process Initiated")
+print("     1. Injecting Anomaly - Single Days")
 # Injecting Single Days
-injections_count = 300
+injections_count = 30  # injection Count can be changed accordingly
 test_data = inject_anomalies_day_wise(train_data, test_data, sleeping_features, injections_count)
 test_data = inject_anomalies_day_wise(train_data, test_data, eating_features, injections_count)
 
+
+print("     2. Injecting Anomaly - Continous Days")
 # Injecting Multiple Continous Days
-min_number_days = 2
-max_number_days = 30
-injections_count = 50
+min_number_days = 3
+max_number_days = 6
+
+injections_count = 10  # injection Count can be changed accordingly
 inject_anomalies_continuous_days(
     train_data,
     test_data,
@@ -179,6 +184,8 @@ inject_anomalies_continuous_days(
     max_number_days,
 )
 
+print("[END] Injection Process Completed")
+input("Press Enter to continue...")
 
 # Step 5: GMM model training completed
 print("Step 5: GMM model training completed.")
@@ -204,11 +211,15 @@ feature_names = train_data.columns
 def dynamic_threshold(recent_scores):
     mean_score = np.mean(recent_scores)
     std_dev = np.std(recent_scores)
-    return mean_score - std_dev
+    return mean_score - (1.8 * std_dev)
 
 
 print("\n\n")
 generalised_monitoring = GeneralisedMonitoring()
+
+total_sleep_anomaly = 0
+total_eating_anomaly = 0
+
 # Step 6: Simulate real-time anomaly detection
 for i in range(test_data.shape[0]):
     day_data = test_data.iloc[i]
@@ -247,6 +258,7 @@ for i in range(test_data.shape[0]):
 
             print("\n\n")
             alert_triggered = True
+            total_sleep_anomaly += 1
 
     if len(recent_eating_anomaly_scores) == window_size:
         threshold = dynamic_threshold(recent_eating_anomaly_scores)
@@ -262,6 +274,9 @@ for i in range(test_data.shape[0]):
 
             print("\n\n")
             alert_triggered = True
+            total_eating_anomaly += 1
 
 if not alert_triggered:
     print("No abnormal patterns detected over the simulated period.")
+else:
+    print(f"Total Sleep Anomaly: {total_sleep_anomaly}\nTotal Eating Anomaly: {total_eating_anomaly}")
