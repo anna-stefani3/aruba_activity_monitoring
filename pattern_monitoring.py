@@ -167,7 +167,7 @@ min_number_days = 3
 max_number_days = 6
 
 injections_count = 10  # injection Count can be changed accordingly
-inject_anomalies_continuous_days(
+test_data = inject_anomalies_continuous_days(
     train_data,
     test_data,
     sleeping_features,
@@ -175,7 +175,7 @@ inject_anomalies_continuous_days(
     min_number_days,
     max_number_days,
 )
-inject_anomalies_continuous_days(
+test_data = inject_anomalies_continuous_days(
     train_data,
     test_data,
     eating_features,
@@ -211,7 +211,7 @@ feature_names = train_data.columns
 def dynamic_threshold(recent_scores):
     mean_score = np.mean(recent_scores)
     std_dev = np.std(recent_scores)
-    return mean_score - (1.8 * std_dev)
+    return mean_score - (std_dev)
 
 
 print("\n\n")
