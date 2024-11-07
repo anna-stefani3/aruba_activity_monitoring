@@ -276,8 +276,12 @@ for i in range(test_data.shape[0]):
 
         if eating_anomaly_score < threshold:
             print(f"Day {str(i).rjust(3)} : {test_data.index[i]} - Abnormal")
-            eating_score, quality_range = generalised_monitoring.get_eating_count_score(day_data[eating_features[0]])
-            cooking_score, quality_range = generalised_monitoring.get_cooking_count_score(day_data[eating_features[1]])
+            eating_count_average = round(sum(test_data.iloc[i - window_size : i][eating_features[0]]) / window_size, 2)
+            eating_score, quality_range = generalised_monitoring.get_eating_count_score(eating_count_average)
+
+            cooking_count_average = round(sum(test_data.iloc[i - window_size : i][eating_features[1]]) / window_size, 2)
+            cooking_score, quality_range = generalised_monitoring.get_cooking_count_score(cooking_count_average)
+
             scores = {eating_features[0]: eating_score, eating_features[1]: cooking_score}
             question_5_score = generalised_monitoring.get_egrist_score(generalised_monitoring.question_5, scores)
             print("EATING ANOMALY")
