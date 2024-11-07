@@ -11,6 +11,9 @@ from data_injection import (
     inject_anomalies_day_wise,
 )
 
+
+MODEL_SENSITIVITY_CONTROL_FOR_STD = 1.95
+
 # Load Data
 file_path = "[ARUBA]-activities_fixed_interval_data.csv"
 df = pd.read_csv(file_path)
@@ -211,7 +214,7 @@ feature_names = train_data.columns
 def dynamic_threshold(recent_scores):
     mean_score = np.mean(recent_scores)
     std_dev = np.std(recent_scores)
-    return mean_score - (std_dev)
+    return mean_score - (MODEL_SENSITIVITY_CONTROL_FOR_STD * std_dev)
 
 
 print("\n\n")
@@ -243,12 +246,20 @@ for i in range(test_data.shape[0]):
 
         if sleeping_anomaly_score < threshold:
             print(f"Day {str(i).rjust(3)} : {test_data.index[i]} - Abnormal")
+            average_sleep_duration = round(
+                sum(test_data.iloc[i - window_size : i][sleeping_features[0]]) / window_size, 2
+            )
             sleep_duration_score, quality_range = generalised_monitoring.get_sleep_duration_score(
-                day_data[sleeping_features[0]]
+                average_sleep_duration
+            )
+
+            average_sleep_distubance = round(
+                sum(test_data.iloc[i - window_size : i][sleeping_features[1]]) / window_size, 2
             )
             sleep_disturbance_score, quality_range = generalised_monitoring.get_sleep_disturbance_score(
-                day_data[sleeping_features[1]]
+                average_sleep_distubance
             )
+
             scores = {sleeping_features[0]: sleep_duration_score, sleeping_features[1]: sleep_disturbance_score}
             question_1_score = generalised_monitoring.get_egrist_score(generalised_monitoring.question_1, scores)
             question_2_score = generalised_monitoring.get_egrist_score(generalised_monitoring.question_2, scores)
