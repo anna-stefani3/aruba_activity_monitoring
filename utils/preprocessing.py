@@ -30,7 +30,7 @@ class Preprocessing:
     def get_injected_dataframe(
         df: pd.DataFrame,
         split_index: int = 730,
-        features: str | list[str] = ["sleep_duration", "sleep_disturbances"],
+        features=["sleep_duration", "sleep_disturbances"],
     ):
         train_data = df.iloc[:split_index]
         test_data = df.iloc[split_index:]
