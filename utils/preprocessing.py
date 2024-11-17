@@ -38,11 +38,22 @@ class Preprocessing:
             train_data,
             test_data,
             features,
-            injections_count=100,
-            min_number_days=2,
-            max_number_days=5,
+            injections_count=10,
+            min_number_days=4,
+            max_number_days=20,
         )
         return train_data, test_data
+
+    @staticmethod
+    def clean_data_anomalies(df):
+        # Clean the 'sleep_duration' column by replacing values outside the range [4, 12]
+        # with the median value of the column.
+        median_val = df["sleep_duration"].median()
+        df["sleep_duration"] = df["sleep_duration"].apply(lambda x: median_val if x < 4 or x > 12 else x)
+
+        # Clean the 'sleep_disturbance' column by capping values at 3
+        df["sleep_disturbances"] = df["sleep_disturbances"].apply(lambda x: 3 if x > 3 else x)
+        return df
 
     @staticmethod
     def time_to_decimal(t):
@@ -86,13 +97,14 @@ class Preprocessing:
             {
                 "sleep_duration": round((current_row["activity"] == "Sleeping").sum() / 60, 2),
                 "sleep_disturbances": sleep_to_bed_to_toilet,
-                "sleep_start_time": sleep_start_time,
-                "wake_up_time": wake_up_time,
-                "eating_count": eating_count,
-                "cooking_count": cooking_count,
-                "active_duration": round(
-                    (current_row["activity"].isin(["Meal_Preparation", "Wash_Dishes", "Housekeeping"])).sum() / 60, 2
-                ),
+                ## removing other features for simnplifying the process
+                # "sleep_start_time": sleep_start_time,
+                # "wake_up_time": wake_up_time,
+                # "eating_count": eating_count,
+                # "cooking_count": cooking_count,
+                # "active_duration": round(
+                #     (current_row["activity"].isin(["Meal_Preparation", "Wash_Dishes", "Housekeeping"])).sum() / 60, 2
+                # ),
             }
         )
 
@@ -103,6 +115,8 @@ def perform_cleaning_resampling_splitting_and_data_injection(
     preprocessing = Preprocessing()
     df = preprocessing.get_cleaned_dataframe(filename)
     df = preprocessing.get_stats_dataframe(df)
+    df = preprocessing.clean_data_anomalies(df)
     df = preprocessing.get_resampled_dataframe(df)
+    df["label"] = 0  # 0 represent normal and 1 will represent abnormal
     train_data, test_data = preprocessing.get_injected_dataframe(df, split_index=split_index, features=features)
     return train_data, test_data
