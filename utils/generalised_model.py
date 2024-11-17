@@ -1,4 +1,4 @@
-class GeneralisedMonitoring:
+class GeneralisedModel:
     def __init__(self):
         """
         Initialize the monitor with optional custom thresholds for each activity.

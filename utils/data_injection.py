@@ -32,14 +32,7 @@ def generate_synthetic_data_using_hmm(original_data):
     return pd.concat([original_data, synthetic_data], ignore_index=True)
 
 
-def inject_anomalies_day_wise(
-    train_df,
-    test_df,
-    feature_list,
-    injections_count,
-    min_std=3,
-    max_std=10,
-):
+def inject_anomalies_day_wise(train_df, test_df, feature_list, injections_count, min_std=3, max_std=10):
     """
     Inject anomalies into test data based on statistics from training data.
 
@@ -82,14 +75,7 @@ def inject_anomalies_day_wise(
 
 
 def inject_anomalies_continuous_days(
-    train_df,
-    test_df,
-    feature_list,
-    injections_count,
-    min_number_days,
-    max_number_days,
-    min_std=3,
-    max_std=10,
+    train_df, test_df, feature_list, injections_count, min_number_days, max_number_days, min_std=3, max_std=10
 ):
     """
     Inject anomalies over continuous days in test data based on training stats.
@@ -122,20 +108,19 @@ def inject_anomalies_continuous_days(
 
         # Randomly choose a starting row index in the test data, ensuring it fits within test data length
         start_row = np.random.choice(test_injected.index[:-days_to_inject])
+        if feature == "sleep_duration":
+            bounds = [(0, 3), (16, 24)]
+            lower_bound, upper_bound = bounds[np.random.choice(range(len(bounds)))]
+        elif feature == "sleep_disturbances":
+            lower_bound, upper_bound = 8, 20
 
-        # randomly generating std_dev_multiplier (min_std represents the minimum accepted std)
-        std_dev_multiplier = min_std + ((max_std - min_std) * np.random.rand())
-
-        # Inject anomaly for a continuous range of days
-        anomaly_value = stats.loc[feature, "mean"] + std_dev_multiplier * stats.loc[feature, "std"]
-        percentage = 0.05  # 5%
-        lower_bound = anomaly_value - (anomaly_value * percentage)
-        upper_bound = anomaly_value + (anomaly_value * percentage)
         for i in range(days_to_inject):
-            if feature != "sleep_disturbances" and "count" not in feature:
+            if feature == "sleep_duration":
                 test_injected.at[start_row + i, feature] = round(np.random.uniform(lower_bound, upper_bound), 2)
-            else:
+                test_injected.at[start_row + i, "label"] = 1
+            elif feature == "sleep_disturbances":
                 test_injected.at[start_row + i, feature] = round(np.random.uniform(lower_bound, upper_bound), 0)
+                test_injected.at[start_row + i, "label"] = 1
 
     return test_injected
 
