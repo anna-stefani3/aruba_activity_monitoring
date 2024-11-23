@@ -1,6 +1,10 @@
 import pandas as pd
 from scipy import stats
-from .data_injection import generate_synthetic_data_using_hmm, inject_anomalies_continuous_days
+from .data_injection import (
+    generate_synthetic_data_using_hmm,
+    gaussian_based_inject_anomalies_continuous_days,
+)
+import numpy as np
 
 
 class Preprocessing:
@@ -27,22 +31,27 @@ class Preprocessing:
         return df
 
     @staticmethod
-    def get_injected_dataframe(
+    def apply_train_test_split(
         df: pd.DataFrame,
         split_index: int = 730,
-        features=["sleep_duration", "sleep_disturbances"],
     ):
         train_data = df.iloc[:split_index]
         test_data = df.iloc[split_index:]
-        test_data = inject_anomalies_continuous_days(
-            train_data,
+        return train_data, test_data
+
+    @staticmethod
+    def get_injected_dataframe(
+        test_data: pd.DataFrame,
+        features=["sleep_duration", "sleep_disturbances"],
+    ):
+        test_data = gaussian_based_inject_anomalies_continuous_days(
             test_data,
             features,
             injections_count=10,
-            min_number_days=4,
+            min_number_days=7,
             max_number_days=20,
         )
-        return train_data, test_data
+        return test_data
 
     @staticmethod
     def clean_data_anomalies(df):
@@ -117,6 +126,8 @@ def perform_cleaning_resampling_splitting_and_data_injection(
     df = preprocessing.get_stats_dataframe(df)
     df = preprocessing.clean_data_anomalies(df)
     df = preprocessing.get_resampled_dataframe(df)
-    df["label"] = 0  # 0 represent normal and 1 will represent abnormal
-    train_data, test_data = preprocessing.get_injected_dataframe(df, split_index=split_index, features=features)
-    return train_data, test_data
+    train_data, test_data = preprocessing.apply_train_test_split(df, split_index=split_index)
+    train_data["label"] = 0  # 0 represent normal and 1 will represent abnormal
+    test_data["label"] = 0  # 0 represent normal and 1 will represent abnormal
+    injected_test_data = preprocessing.get_injected_dataframe(test_data, features=features)
+    return train_data, injected_test_data

@@ -125,6 +125,68 @@ def inject_anomalies_continuous_days(
     return test_injected
 
 
+def gaussian_based_inject_anomalies_continuous_days(
+    test_df, feature_list, injections_count, min_number_days, max_number_days
+):
+    """
+    Inject anomalies over continuous days in test data based on training stats.
+    Introduces smaller, more gradual changes for a realistic behavioral shift.
+
+    Parameters:
+    - test_df: DataFrame with testing data (to inject anomalies).
+    - feature_list: List of features to consider for anomaly injection.
+    - injections_count: Number of times to inject anomalies.
+    - min_number_days: Minimum number of continuous days for injection.
+    - max_number_days: Maximum number of continuous days for injection.
+    - min_std: Minimum Multiplier for standard deviation to control anomaly intensity.
+    - mean_shift: Mean shift to apply to features (for gradual change).
+
+    Returns:
+    - DataFrame with injected anomalies.
+    """
+    # Calculate mean and std for each feature in training data
+    stats = test_df[feature_list].agg(["mean", "std"]).T
+
+    # Copy test data to avoid altering original
+    test_injected = test_df.copy()
+
+    for _ in range(injections_count):
+        # Randomly choose a feature from the list
+        feature = "sleep_duration"  # np.random.choice(feature_list)
+
+        # Randomly choose the number of days for this injection
+        days_to_inject = np.random.randint(min_number_days, max_number_days + 1)
+
+        # Randomly choose a starting row index in the test data, ensuring it fits within test data length
+        start_row = np.random.choice(test_injected.index[:-days_to_inject])
+
+        # Apply Gaussian noise with mean shift to simulate gradual change over time
+        if feature == "sleep_duration":
+            # Use normal distribution for gradual changes (simulate realistic anomaly)
+            noise_duration = np.random.normal(loc=0, scale=4, size=days_to_inject)
+
+            for i in range(days_to_inject):
+                if noise_duration[i] >= 0:
+                    new_value = stats.loc[feature, "mean"] + stats.loc[feature, "std"] + noise_duration[i]
+                else:
+                    new_value = (
+                        stats.loc[feature, "mean"] - stats.loc[feature, "std"] + (2 / 3 * noise_duration[i])
+                    )  # using 1/3 for lower number cause 8 is ideal sleep and 1/3 of 24 hours
+                # Ensure sleep duration stays within bounds [0, 24]
+                test_injected.at[start_row + i, feature] = round(np.clip(new_value, 0, 24), 2)
+                test_injected.at[start_row + i, "label"] = 1  # Label as anomalous
+        elif feature == "sleep_disturbances":
+            # For sleep disturbances, increment probabilistically
+            disturbance_change = np.random.binomial(1, 0.5, size=days_to_inject)  # Probabilistically increase
+            for i in range(days_to_inject):
+                new_value = test_injected.at[start_row + i, feature] + disturbance_change[i]
+                # Ensure a realistic range for sleep disturbances
+                test_injected.at[start_row + i, feature] = round(np.clip(new_value, 0, 20), 0)
+                test_injected.at[start_row + i, "label"] = 1  # Label as anomalous
+
+    return test_injected
+
+
 if __name__ == "__main__":
     """
     TESTING INJECTION PROCESSES
