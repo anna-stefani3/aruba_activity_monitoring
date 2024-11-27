@@ -129,6 +129,8 @@ def perform_cleaning_resampling_splitting_and_data_injection(
     df = preprocessing.clean_data_anomalies(df)
     df = preprocessing.get_resampled_dataframe(df)
     train_data, test_data = preprocessing.apply_train_test_split(df, split_index=split_index)
+    train_data = train_data.copy()
+    test_data = test_data.copy()
     train_data["label"] = 0  # 0 represent normal and 1 will represent abnormal
     test_data["label"] = 0  # 0 represent normal and 1 will represent abnormal
     injected_test_data = preprocessing.get_injected_dataframe(test_data, features=features)
