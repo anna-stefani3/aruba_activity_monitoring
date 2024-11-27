@@ -14,8 +14,8 @@ print(
 
 sleep_features = ["sleep_duration", "sleep_disturbances"]
 
-lagged_train_data = get_lagged_features_dataframe(train_data, sleep_features)
-lagged_test_data = get_lagged_features_dataframe(test_data, sleep_features)
+lagged_train_data = get_lagged_features_dataframe(train_data, sleep_features, lag_size=5)
+lagged_test_data = get_lagged_features_dataframe(test_data, sleep_features, lag_size=5)
 
 
 print("Accuracy Without Lagged Features")
