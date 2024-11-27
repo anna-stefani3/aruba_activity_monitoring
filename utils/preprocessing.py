@@ -55,10 +55,12 @@ class Preprocessing:
 
     @staticmethod
     def clean_data_anomalies(df):
-        # Clean the 'sleep_duration' column by replacing values outside the range [4, 12]
-        # with the median value of the column.
-        median_val = df["sleep_duration"].median()
-        df["sleep_duration"] = df["sleep_duration"].apply(lambda x: median_val if x < 4 or x > 12 else x)
+        stats = df["sleep_duration"].agg(["mean", "std"]).T
+        df["sleep_duration"] = df["sleep_duration"].apply(
+            lambda x: (
+                stats["mean"] if x < stats["mean"] - 2 * stats["std"] or x > stats["mean"] + 2 * stats["std"] else x
+            )
+        )
 
         # Clean the 'sleep_disturbance' column by capping values at 3
         df["sleep_disturbances"] = df["sleep_disturbances"].apply(lambda x: 3 if x > 3 else x)
