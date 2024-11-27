@@ -138,8 +138,6 @@ def gaussian_based_inject_anomalies_continuous_days(
     - injections_count: Number of times to inject anomalies.
     - min_number_days: Minimum number of continuous days for injection.
     - max_number_days: Maximum number of continuous days for injection.
-    - min_std: Minimum Multiplier for standard deviation to control anomaly intensity.
-    - mean_shift: Mean shift to apply to features (for gradual change).
 
     Returns:
     - DataFrame with injected anomalies.
@@ -170,7 +168,7 @@ def gaussian_based_inject_anomalies_continuous_days(
                     new_value = stats.loc[feature, "mean"] + stats.loc[feature, "std"] + noise_duration[i]
                 else:
                     new_value = (
-                        stats.loc[feature, "mean"] - stats.loc[feature, "std"] + (2 / 3 * noise_duration[i])
+                        stats.loc[feature, "mean"] - stats.loc[feature, "std"] + (0.66 * noise_duration[i])
                     )  # using 1/3 for lower number cause 8 is ideal sleep and 1/3 of 24 hours
                 # Ensure sleep duration stays within bounds [0, 24]
                 test_injected.at[start_row + i, feature] = round(np.clip(new_value, 0, 24), 2)
