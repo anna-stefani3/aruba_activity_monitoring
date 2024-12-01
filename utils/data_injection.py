@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from hmmlearn import hmm
+from sklearn.mixture import GaussianMixture
+from scipy.stats import poisson
 
 
 def generate_synthetic_data_using_hmm(original_data):
@@ -30,6 +32,71 @@ def generate_synthetic_data_using_hmm(original_data):
 
     # Combine the original and synthetic data
     return pd.concat([original_data, synthetic_data], ignore_index=True)
+
+
+def generate_synthetic_data_using_gmm(original_data, n_components=3, n_samples_multiplier=10):
+    """
+    Generate synthetic data using Gaussian Mixture Model (GMM).
+
+    Parameters:
+    original_data (pd.DataFrame): The original dataset with `sleep_duration` and `sleep_disturbances`.
+    n_components (int): The number of components (clusters) for the GMM.
+    n_samples_multiplier (int): The multiplier for the number of synthetic samples to generate.
+
+    Returns:
+    pd.DataFrame: The original dataset with appended synthetic data.
+    """
+    # Fit a Gaussian Mixture Model
+    gmm = GaussianMixture(n_components=n_components, random_state=42)
+    gmm.fit(original_data)
+
+    # Generate synthetic data (n_samples_multiplier times the original data)
+    n_samples = len(original_data) * n_samples_multiplier
+    synthetic_data = gmm.sample(n_samples)[0]
+
+    # Create a DataFrame for the synthetic data
+    synthetic_df = pd.DataFrame(synthetic_data, columns=original_data.columns)
+
+    # Combine original and synthetic data
+    return pd.concat([original_data, synthetic_df], ignore_index=True)
+
+
+def generate_synthetic_data_using_gmm_and_poisson(original_data, n_components=3, n_samples_multiplier=10):
+    """
+    Generate synthetic data using Gaussian Mixture Model (GMM) for continuous features
+    and Poisson distribution for discrete features.
+
+    Parameters:
+    original_data (pd.DataFrame): The original dataset with `sleep_duration` and `sleep_disturbances`.
+    n_components (int): The number of components (clusters) for the GMM (for continuous features).
+    n_samples_multiplier (int): The multiplier for the number of synthetic samples to generate.
+
+    Returns:
+    pd.DataFrame: The original dataset with appended synthetic data.
+    """
+
+    # Separate continuous and discrete columns
+    continuous_columns = ["sleep_duration"]
+    discrete_columns = ["sleep_disturbances"]
+
+    # Fit a Gaussian Mixture Model (GMM) for continuous features
+    gmm = GaussianMixture(n_components=n_components, random_state=42)
+    gmm.fit(original_data[continuous_columns])
+
+    # Generate synthetic data for continuous features (e.g., sleep_duration)
+    n_samples = len(original_data) * n_samples_multiplier
+    synthetic_continuous_data = gmm.sample(n_samples)[0]
+
+    # Generate synthetic data for discrete features (e.g., sleep_disturbances) using Poisson distribution
+    mean_disturbances = original_data["sleep_disturbances"].mean()  # Mean value of original disturbances
+    synthetic_discrete_data = poisson.rvs(mu=mean_disturbances, size=n_samples)
+
+    # Create a DataFrame for the synthetic data
+    synthetic_df = pd.DataFrame(synthetic_continuous_data, columns=continuous_columns)
+    synthetic_df["sleep_disturbances"] = synthetic_discrete_data  # Add the synthetic sleep_disturbances column
+
+    # Combine original and synthetic data
+    return pd.concat([original_data, synthetic_df], ignore_index=True)
 
 
 def inject_anomalies_day_wise(train_df, test_df, feature_list, injections_count, min_std=3, max_std=10):
@@ -161,7 +228,7 @@ def gaussian_based_inject_anomalies_continuous_days(
         # Apply Gaussian noise with mean shift to simulate gradual change over time
         if feature == "sleep_duration":
             # Use normal distribution for gradual changes (simulate realistic anomaly)
-            noise_duration = np.random.normal(loc=0, scale=4, size=days_to_inject)
+            noise_duration = np.random.normal(loc=0, scale=2, size=days_to_inject)
 
             for i in range(days_to_inject):
                 if noise_duration[i] >= 0:
@@ -175,13 +242,8 @@ def gaussian_based_inject_anomalies_continuous_days(
                 test_injected.at[start_row + i, "label"] = 1  # Label as anomalous
         elif feature == "sleep_disturbances":
             # For sleep disturbances, increment probabilistically
-            # Define the range of numbers (0 to 10)
-            numbers = np.arange(1, 10)
-
-            # Create a linear gradient of probabilities
-            start_prob = 0.20  # Probability for 0
-            end_prob = 0.05  # Probability for 10
-            probabilities = np.linspace(start_prob, end_prob, len(numbers))
+            numbers = [0, 1]
+            probabilities = np.array([0.9, 0.1])
 
             # Normalize the probabilities to ensure their sum is 1
             probabilities /= probabilities.sum()

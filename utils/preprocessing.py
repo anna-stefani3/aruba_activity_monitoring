@@ -2,9 +2,12 @@ import pandas as pd
 from scipy import stats
 from .data_injection import (
     generate_synthetic_data_using_hmm,
+    generate_synthetic_data_using_gmm,
+    generate_synthetic_data_using_gmm_and_poisson,
     gaussian_based_inject_anomalies_continuous_days,
 )
 import numpy as np
+from utils.plotting import plot_all_features_with_clusters
 
 
 class Preprocessing:
@@ -26,9 +29,18 @@ class Preprocessing:
 
     @staticmethod
     def get_resampled_dataframe(df):
-        df = generate_synthetic_data_using_hmm(df)
-        df = df.fillna(0)
-        return df
+        # df1 = generate_synthetic_data_using_hmm(df)
+        # df1 = df1.sample(frac=1, random_state=42).reset_index(drop=True)
+        # plot_all_features_with_clusters(df1, plot_title="HMM BASED CLUSTERS")
+
+        # df2 = generate_synthetic_data_using_gmm(df)
+        # df2 = df2.sample(frac=1, random_state=42).reset_index(drop=True)
+        # plot_all_features_with_clusters(df2, plot_title="GMM BASED CLUSTERS")
+
+        df3 = generate_synthetic_data_using_gmm_and_poisson(df)
+        df3 = df3.sample(frac=1, random_state=42).reset_index(drop=True)
+        plot_all_features_with_clusters(df3, plot_title="GMM + POISSON BASED CLUSTERS")
+        return df3
 
     @staticmethod
     def apply_train_test_split(
@@ -125,13 +137,20 @@ def perform_cleaning_resampling_splitting_and_data_injection(
 ):
     preprocessing = Preprocessing()
     df = preprocessing.get_cleaned_dataframe(filename)
+
     df = preprocessing.get_stats_dataframe(df)
+    plot_all_features_with_clusters(df, plot_title="ORIGINAL DATA PLOT")
+
     df = preprocessing.clean_data_anomalies(df)
+    plot_all_features_with_clusters(df, plot_title="ORIGINAL DATA AFTER CLEANING ANOMALIES")
+
     df = preprocessing.get_resampled_dataframe(df)
+
     train_data, test_data = preprocessing.apply_train_test_split(df, split_index=split_index)
     train_data = train_data.copy()
     test_data = test_data.copy()
     train_data["label"] = 0  # 0 represent normal and 1 will represent abnormal
     test_data["label"] = 0  # 0 represent normal and 1 will represent abnormal
     injected_test_data = preprocessing.get_injected_dataframe(test_data, features=features)
+    plot_all_features_with_clusters(injected_test_data, plot_title="Injected Data Plotting")
     return train_data, injected_test_data
