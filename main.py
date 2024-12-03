@@ -19,7 +19,11 @@ lagged_test_data = get_lagged_features_dataframe(test_data, sleep_features, lag_
 
 
 print("Accuracy Without Lagged Features")
-execute_personalised_model(train_data, test_data)  # without Lagged Features
+# skipping first 4 items so that the number of number of data points are same
+
+print(f"Number of rows in Without Lagged Feature Dataset : {train_data[5:].shape[0]}")
+print(f"Number of rows in Lagged Feature Dataset : {lagged_train_data.shape[0]}")
+execute_personalised_model(train_data[5:], test_data[5:])  # without Lagged Features
 
 print("Accuracy With Lagged Features")
 execute_personalised_model(lagged_train_data, lagged_test_data)  # with Lagged Features
