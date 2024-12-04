@@ -248,11 +248,11 @@ def gaussian_based_inject_anomalies_continuous_days(
             # Normalize the probabilities to ensure their sum is 1
             probabilities /= probabilities.sum()
             disturbance_change = np.random.choice(numbers, size=days_to_inject, p=probabilities)
-            sleep_disturbance_threshold = 4
+            sleep_disturbance_threshold = 3
             for i in range(days_to_inject):
                 new_value = sleep_disturbance_threshold + abs(int(disturbance_change[i]))
                 # Ensure a realistic range for sleep disturbances
-                test_injected.at[start_row + i, feature] = round(np.clip(new_value, 0, 20), 0)
+                test_injected.at[start_row + i, feature] = round(np.clip(new_value, 0, 7), 0)
                 test_injected.at[start_row + i, "label"] = 1  # Label as anomalous
 
     return test_injected
