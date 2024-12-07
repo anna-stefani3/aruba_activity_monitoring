@@ -3,6 +3,15 @@ from utils.lagged_features import get_lagged_features_dataframe
 
 from utils.personalised_model import execute_personalised_model
 
+
+import numpy as np
+import random
+
+seed = 42
+random.seed(seed)
+np.random.seed(seed)
+
+
 filename = "aruba_dataset.csv"
 train_data, test_data = perform_cleaning_resampling_splitting_and_data_injection(filename=filename)
 
