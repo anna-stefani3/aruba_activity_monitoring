@@ -1,8 +1,6 @@
 import pandas as pd
 from scipy import stats
 from .data_injection import (
-    generate_synthetic_data_using_hmm,
-    generate_synthetic_data_using_gmm,
     generate_synthetic_data_using_gmm_and_poisson,
     gaussian_based_inject_anomalies_continuous_days,
 )
@@ -29,18 +27,10 @@ class Preprocessing:
 
     @staticmethod
     def get_resampled_dataframe(df):
-        # df1 = generate_synthetic_data_using_hmm(df)
-        # df1 = df1.sample(frac=1, random_state=42).reset_index(drop=True)
-        # plot_all_features_with_clusters(df1, plot_title="HMM BASED CLUSTERS")
-
-        # df2 = generate_synthetic_data_using_gmm(df)
-        # df2 = df2.sample(frac=1, random_state=42).reset_index(drop=True)
-        # plot_all_features_with_clusters(df2, plot_title="GMM BASED CLUSTERS")
-
-        df3 = generate_synthetic_data_using_gmm_and_poisson(df)
-        df3 = df3.sample(frac=1, random_state=42).reset_index(drop=True)
-        plot_all_features_with_clusters(df3, plot_title="GMM + POISSON BASED CLUSTERS")
-        return df3
+        df = generate_synthetic_data_using_gmm_and_poisson(df)
+        df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+        plot_all_features_with_clusters(df, plot_title="GMM + POISSON BASED CLUSTERS")
+        return df
 
     @staticmethod
     def apply_train_test_split(
@@ -91,43 +81,11 @@ class Preprocessing:
         sleep_to_bed_to_toilet = (
             (current_row["activity"] == "Bed_to_Toilet") & (previous_activity == "Sleeping")
         ).sum()
-        eating_count = ((current_row["activity"] == "Eating") & (previous_activity != "Eating")).sum()
-        cooking_count = (
-            (current_row["activity"] == "Meal_Preparation") & (previous_activity != "Meal_Preparation")
-        ).sum()
-
-        # Determine the sleep start time using vectorized operations
-        sleep_start_indices = (current_row["activity"] == "Sleeping") & ~previous_activity.isin(
-            ["Sleeping", "Bed_to_Toilet"]
-        )
-        sleep_start_time = None
-        if sleep_start_indices.any():
-            sleep_start_time = Preprocessing().time_to_decimal(
-                current_row.index[sleep_start_indices][0]
-            )  # Get first occurrence
-
-        # Determine the wake-up time using vectorized operations
-        wake_up_indices = ~current_row["activity"].isin(["Sleeping", "Bed_to_Toilet"]) & (
-            previous_activity == "Sleeping"
-        )
-        wake_up_time = None
-        if wake_up_indices.any():
-            wake_up_time = Preprocessing().time_to_decimal(
-                current_row.index[wake_up_indices][0]
-            )  # Get first occurrence
 
         return pd.Series(
             {
                 "sleep_duration": round((current_row["activity"] == "Sleeping").sum() / 60, 2),
                 "sleep_disturbances": sleep_to_bed_to_toilet,
-                ## removing other features for simnplifying the process
-                # "sleep_start_time": sleep_start_time,
-                # "wake_up_time": wake_up_time,
-                # "eating_count": eating_count,
-                # "cooking_count": cooking_count,
-                # "active_duration": round(
-                #     (current_row["activity"].isin(["Meal_Preparation", "Wash_Dishes", "Housekeeping"])).sum() / 60, 2
-                # ),
             }
         )
 

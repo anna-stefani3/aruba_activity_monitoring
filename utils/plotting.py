@@ -3,49 +3,6 @@ import seaborn as sns
 import pandas as pd
 
 
-def plot_clusters(dataframe: pd.DataFrame, feature_name: str, cluster_column: str = "cluster"):
-    """
-    Plots clusters based on a specific feature.
-
-    Parameters:
-        dataframe (pd.DataFrame): The dataframe containing the data.
-        feature_name (str): The name of the feature to plot.
-        cluster_column (str): The name of the column representing cluster labels. Default is 'cluster'.
-
-    Raises:
-        ValueError: If the feature_name or cluster_column is not in the dataframe.
-    """
-    # Validate input
-    if feature_name not in dataframe.columns:
-        raise ValueError(f"Feature '{feature_name}' not found in the dataframe.")
-    if cluster_column not in dataframe.columns:
-        raise ValueError(f"Cluster column '{cluster_column}' not found in the dataframe.")
-
-    # Plotting
-    plt.figure(figsize=(10, 6))
-    sns.scatterplot(
-        x=feature_name,
-        y=dataframe.index,  # Use index or add another feature for better visualization
-        hue=cluster_column,
-        palette="viridis",
-        data=dataframe,
-        s=50,  # Marker size
-        alpha=0.7,  # Transparency for better overlap visualization
-    )
-
-    plt.title(f"Clusters based on {feature_name}")
-    plt.xlabel(feature_name)
-    plt.ylabel("Index")
-    plt.legend(title="Cluster", bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.tight_layout()
-    plt.show()
-
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-
-
 def plot_all_features_with_clusters(dataframe: pd.DataFrame, plot_title: str = "PLOT"):
     """
     Creates a single plot with subplots for all numerical features in the dataframe

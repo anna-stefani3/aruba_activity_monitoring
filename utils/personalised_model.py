@@ -26,16 +26,6 @@ class PersonalisedModel:
         score = self.model.score_samples(sample_data)
         return score
 
-    def get_score_threshold(self):
-        scores = self.model.score_samples(self.scaled_training_data)
-
-        mean = np.mean(scores)
-        std = np.std(scores)
-
-        # Set the threshold at 2 standard deviations below the mean
-        threshold = mean - (2 * std)
-        return threshold
-
     def get_percentile_score_threshold(self, percentile=5):
         """
         Calculate the anomaly threshold based on the specified percentile of the score distribution.
