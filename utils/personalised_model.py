@@ -36,13 +36,29 @@ class PersonalisedModel:
         threshold = mean - (2 * std)
         return threshold
 
+    def get_percentile_score_threshold(self, percentile=5):
+        """
+        Calculate the anomaly threshold based on the specified percentile of the score distribution.
+
+        Args:
+            percentile (int): The percentile value to set the threshold. Default is 5 (lower 5%).
+
+        Returns:
+            float: The anomaly threshold.
+        """
+        scores = self.model.score_samples(self.scaled_training_data)
+
+        # Calculate the threshold based on the specified percentile
+        threshold = np.percentile(scores, percentile)
+        return threshold
+
 
 def execute_personalised_model(lagged_train_data, lagged_test_data):
     model = PersonalisedModel(lagged_train_data, covariance_type="spherical")
     model.train_gmm_model()
 
     scaler = model.scaler
-    anomaly_threshold = model.get_score_threshold()
+    anomaly_threshold = model.get_percentile_score_threshold()
 
     predictions = [0] * lagged_test_data.shape[0]
     for i in range(lagged_test_data.shape[0]):
