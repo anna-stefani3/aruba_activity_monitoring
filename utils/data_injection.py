@@ -76,13 +76,17 @@ def gaussian_based_inject_anomalies_continuous_days(
         # Randomly choose a starting row index in the test data, ensuring it fits within test data length
         start_row = np.random.choice(test_injected.index[:-days_to_inject])
 
-        # Apply Gaussian noise with mean shift to simulate realistic anomaly
+        # increase_in_sleep_duration method is to simulate slight increament in sleep duration
+        # each time. To simulate slow and gradual increase in sleep duration
         if method == "increase_in_sleep_duration":
-            # Use normal distribution to simulate realistic anomaly
+            # current_increament_size initilaised with 0 and then it keeps on increasing each time
             current_increament_size = 0
 
             for i in range(days_to_inject):
+                # increament_noise random number between 0.1 and 0.5 which will be added to current_increament_size
                 increament_noise = np.random.uniform(0.1, 0.5)
+
+                # adding noise to current increament size
                 current_increament_size += increament_noise
                 new_sleep_duration_value = (
                     stats.loc["sleep_duration", "mean"] + stats.loc["sleep_duration", "std"] + current_increament_size
@@ -91,20 +95,30 @@ def gaussian_based_inject_anomalies_continuous_days(
                 # Ensure sleep duration stays within bounds [0, 24]
                 test_injected.at[start_row + i, "sleep_duration"] = round(np.clip(new_sleep_duration_value, 0, 24), 2)
                 test_injected.at[start_row + i, "label"] = 1  # Label as anomalous
+
+        # this method slowly decrease the sleep_duration + also increases Sleep Disturbances at same time
         if method == "decrease_in_sleep_duration":
-            # For sleep disturbances, increment probabilistically
-            numbers = [0, 1, 2, 3]
+            # For sleep disturbances, posible increase and there relevant probability
+            distubance_numbers = [0, 1, 2, 3]
             probabilities = np.array([0.75, 0.18, 0.05, 0.02])
+
+            # Average Sleep Disturbances Threshold
             sleep_disturbance_threshold = 3
 
-            disturbance_change = np.random.choice(numbers, size=days_to_inject, p=probabilities)
+            # generating n number of disturbance based on distubance_numbers and probabilities
+            disturbance_change = np.random.choice(distubance_numbers, size=days_to_inject, p=probabilities)
+
+            # current_decrement_size initilaised with 0 and then it keeps on increasing each time
             current_decrement_size = 0
             for i in range(days_to_inject):
-                decrement_noise = np.random.uniform(0.5, 0.25)
+                # decrement_noise is random number between 0.05 and 0.25 which will be added to current_decrement_size
+                decrement_noise = np.random.uniform(0.05, 0.25)
                 current_decrement_size += decrement_noise
                 new_sleep_duration_value = (
                     stats.loc["sleep_duration", "mean"] - stats.loc["sleep_duration", "std"] - current_decrement_size
                 )
+
+                # Ensure a realistic range for sleep duration for under sleeping
                 new_sleep_disturbances_value = sleep_disturbance_threshold + disturbance_change[i]
                 # Ensure a realistic range for sleep disturbances
                 test_injected.at[start_row + i, "sleep_duration"] = round(np.clip(new_sleep_duration_value, 0, 24), 2)
