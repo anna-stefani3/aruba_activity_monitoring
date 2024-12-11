@@ -43,7 +43,7 @@ def generate_synthetic_data_using_gmm_and_poisson(original_data, n_components=3,
 
 
 def gaussian_based_inject_anomalies_continuous_days(
-    test_df, feature_list, injections_count, min_number_days, max_number_days
+    test_df, feature_list, injections_count, min_number_days, max_number_days, anomaly_scale: int = 1
 ):
     """
     Inject anomalies over continuous days in test data based on training stats.
@@ -89,7 +89,7 @@ def gaussian_based_inject_anomalies_continuous_days(
                 # adding noise to current increament size
                 current_increament_size += increament_noise
                 new_sleep_duration_value = (
-                    stats.loc["sleep_duration", "mean"] + stats.loc["sleep_duration", "std"] + current_increament_size
+                    stats.loc["sleep_duration", "mean"] + (anomaly_scale * stats.loc["sleep_duration", "std"]) + current_increament_size
                 )
 
                 # Ensure sleep duration stays within bounds [0, 24]
@@ -115,7 +115,7 @@ def gaussian_based_inject_anomalies_continuous_days(
                 decrement_noise = np.random.uniform(0.05, 0.25)
                 current_decrement_size += decrement_noise
                 new_sleep_duration_value = (
-                    stats.loc["sleep_duration", "mean"] - stats.loc["sleep_duration", "std"] - current_decrement_size
+                    stats.loc["sleep_duration", "mean"] - (anomaly_scale * stats.loc["sleep_duration", "std"]) - current_decrement_size
                 )
 
                 # Ensure a realistic range for sleep duration for under sleeping
