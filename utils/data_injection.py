@@ -66,8 +66,9 @@ def gaussian_based_inject_anomalies_continuous_days(
     test_injected = test_df.copy()
 
     for _ in range(injections_count):
-        # Randomly choose a feature from the list
-        feature = np.random.choice(feature_list)
+        methods_list = ["increase_in_sleep_duration", "decrease_in_sleep_duration"]
+        # Randomly choose a method from the methods_list
+        method = np.random.choice(methods_list)
 
         # Randomly choose the number of days for this injection
         days_to_inject = np.random.randint(min_number_days, max_number_days + 1)
@@ -76,33 +77,40 @@ def gaussian_based_inject_anomalies_continuous_days(
         start_row = np.random.choice(test_injected.index[:-days_to_inject])
 
         # Apply Gaussian noise with mean shift to simulate realistic anomaly
-        if feature == "sleep_duration":
+        if method == "increase_in_sleep_duration":
             # Use normal distribution to simulate realistic anomaly
-            noise_duration = np.random.normal(loc=0, scale=2, size=days_to_inject)
+            current_increament_size = 0
 
             for i in range(days_to_inject):
-                if noise_duration[i] >= 0:
-                    new_value = stats.loc[feature, "mean"] + stats.loc[feature, "std"] + noise_duration[i]
-                else:
-                    new_value = (
-                        stats.loc[feature, "mean"] - stats.loc[feature, "std"] + (0.66 * noise_duration[i])
-                    )  # using 2/3 for lower number
+                increament_noise = np.random.uniform(0.1, 0.5)
+                current_increament_size += increament_noise
+                new_sleep_duration_value = (
+                    stats.loc["sleep_duration", "mean"] + stats.loc["sleep_duration", "std"] + current_increament_size
+                )
+
                 # Ensure sleep duration stays within bounds [0, 24]
-                test_injected.at[start_row + i, feature] = round(np.clip(new_value, 0, 24), 2)
+                test_injected.at[start_row + i, "sleep_duration"] = round(np.clip(new_sleep_duration_value, 0, 24), 2)
                 test_injected.at[start_row + i, "label"] = 1  # Label as anomalous
-        elif feature == "sleep_disturbances":
+        if method == "decrease_in_sleep_duration":
             # For sleep disturbances, increment probabilistically
-            numbers = [0, 1]
-            probabilities = np.array([0.9, 0.1])
-
-            # Normalize the probabilities to ensure their sum is 1
-            probabilities /= probabilities.sum()
-            disturbance_change = np.random.choice(numbers, size=days_to_inject, p=probabilities)
+            numbers = [0, 1, 2, 3]
+            probabilities = np.array([0.75, 0.18, 0.05, 0.02])
             sleep_disturbance_threshold = 3
+
+            disturbance_change = np.random.choice(numbers, size=days_to_inject, p=probabilities)
+            current_decrement_size = 0
             for i in range(days_to_inject):
-                new_value = sleep_disturbance_threshold + abs(int(disturbance_change[i]))
+                decrement_noise = np.random.uniform(0.5, 0.25)
+                current_decrement_size += decrement_noise
+                new_sleep_duration_value = (
+                    stats.loc["sleep_duration", "mean"] - stats.loc["sleep_duration", "std"] - current_decrement_size
+                )
+                new_sleep_disturbances_value = sleep_disturbance_threshold + disturbance_change[i]
                 # Ensure a realistic range for sleep disturbances
-                test_injected.at[start_row + i, feature] = round(np.clip(new_value, 0, 7), 0)
+                test_injected.at[start_row + i, "sleep_duration"] = round(np.clip(new_sleep_duration_value, 0, 24), 2)
+                test_injected.at[start_row + i, "sleep_disturbances"] = round(
+                    np.clip(new_sleep_disturbances_value, 0, 7), 0
+                )
                 test_injected.at[start_row + i, "label"] = 1  # Label as anomalous
 
     return test_injected

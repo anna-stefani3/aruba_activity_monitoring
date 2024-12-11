@@ -49,9 +49,9 @@ class Preprocessing:
         test_data = gaussian_based_inject_anomalies_continuous_days(
             test_data,
             features,
-            injections_count=10,
-            min_number_days=7,
-            max_number_days=20,
+            injections_count=40,
+            min_number_days=5,
+            max_number_days=15,
         )
         return test_data
 
