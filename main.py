@@ -22,17 +22,17 @@ print(
 )
 
 sleep_features = ["sleep_duration", "sleep_disturbances"]
-
-lagged_train_data = get_lagged_features_dataframe(train_data, sleep_features, lag_size=5)
-lagged_test_data = get_lagged_features_dataframe(test_data, sleep_features, lag_size=5)
+lag_size = 5
+lagged_train_data = get_lagged_features_dataframe(train_data, sleep_features, lag_size=lag_size)
+lagged_test_data = get_lagged_features_dataframe(test_data, sleep_features, lag_size=lag_size)
 
 
 print("Accuracy Without Lagged Features")
 # skipping first 4 items so that the number of number of data points are same
 
-print(f"Number of rows in Without Lagged Feature Dataset : {train_data[5:].shape[0]}")
+print(f"Number of rows in Without Lagged Feature Dataset : {train_data[lag_size - 1 :].shape[0]}")
 print(f"Number of rows in Lagged Feature Dataset : {lagged_train_data.shape[0]}")
-execute_personalised_model(train_data[5:], test_data[5:])  # without Lagged Features
+execute_personalised_model(train_data[lag_size - 1 :], test_data[lag_size - 1 :])  # without Lagged Features
 
 print("Accuracy With Lagged Features")
 execute_personalised_model(lagged_train_data, lagged_test_data)  # with Lagged Features
