@@ -1,10 +1,10 @@
 from utils.preprocessing import perform_cleaning_resampling_splitting_and_data_injection
 from utils.lagged_features import get_lagged_features_dataframe
-
-from utils.personalised_model import execute_personalised_model
+from utils.personalised_model import execute_personalised_model, execute_example_flow
 
 
 import numpy as np
+import pandas as pd
 import random
 
 seed = 42
@@ -36,3 +36,16 @@ execute_personalised_model(train_data[lag_size - 1 :], test_data[lag_size - 1 :]
 
 print("Accuracy With Lagged Features")
 execute_personalised_model(lagged_train_data, lagged_test_data)  # with Lagged Features
+
+
+###### EXAMPLE ######
+
+print("\n\nExample Output for Personalised and Generalised Models Together")
+example_data = {
+    "sleep_duration": [3, 3, 5, 5, 8, 8, 11, 11, 13, 13],
+    "sleep_disturbances": [0, 8, 1, 6, 0, 4, 0, 5, 1, 4],
+}
+example_df = pd.DataFrame(example_data)
+
+
+execute_example_flow(train_data[lag_size - 1 :], example_df)

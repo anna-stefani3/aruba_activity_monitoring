@@ -3,6 +3,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
 import pandas as pd
 import numpy as np
+from utils.generalised_model import GeneralisedModel
 
 
 class PersonalisedModel:
@@ -43,29 +44,67 @@ class PersonalisedModel:
         return threshold
 
 
-def execute_personalised_model(lagged_train_data, lagged_test_data):
-    model = PersonalisedModel(lagged_train_data, covariance_type="spherical")
+def execute_personalised_model(train_data, test_data):
+    model = PersonalisedModel(train_data, covariance_type="spherical")
     model.train_gmm_model()
 
     scaler = model.scaler
     anomaly_threshold = model.get_percentile_score_threshold()
 
-    predictions = [0] * lagged_test_data.shape[0]
-    for i in range(lagged_test_data.shape[0]):
-        day_data = lagged_test_data.iloc[i].drop("label")
+    predictions = [0] * test_data.shape[0]
+    for i in range(test_data.shape[0]):
+        day_data = test_data.iloc[i].drop("label")
         scaled_day_data = scaler.transform(day_data.values.reshape(1, -1))
         score = model.get_score(scaled_day_data)
         if score < anomaly_threshold:
             predictions[i] = 1
 
     # Calculate accuracy
-    accuracy = accuracy_score(lagged_test_data["label"], predictions)
+    accuracy = accuracy_score(test_data["label"], predictions)
     print(f"Accuracy: {accuracy:.2f}")
 
     # Optionally, print classification report for more insights
-    print(classification_report(lagged_test_data["label"], predictions))
+    print(classification_report(test_data["label"], predictions))
 
     del model
     del scaler
     del anomaly_threshold
     del accuracy
+
+
+def execute_example_flow(train_data, test_data):
+    model = PersonalisedModel(train_data, covariance_type="spherical")
+    model.train_gmm_model()
+
+    scaler = model.scaler
+    anomaly_threshold = model.get_percentile_score_threshold()
+    print(f"Personalised Model Anomaly Threshold: {anomaly_threshold}")
+
+    predictions = [0] * test_data.shape[0]
+    generalised_model = GeneralisedModel()
+    print(
+        "| Sleep Duration | Sleep Disturbances | Personalised Label | Generalised Sleep Duration Label | Generalised Sleep Disturbances Label |"
+    )
+    print("-" * 134)
+    for i in range(test_data.shape[0]):
+        day_data = test_data.iloc[i]
+        scaled_day_data = scaler.transform(day_data.values.reshape(1, -1))
+        score = model.get_score(scaled_day_data)
+        output = "Normal"
+
+        if score < anomaly_threshold:
+            predictions[i] = 1
+            output = "Anomaly"
+            sdu_label = generalised_model.get_sleep_duration_label(day_data["sleep_duration"])
+            sdi_label = generalised_model.get_sleep_disturbance_label(day_data["sleep_disturbances"])
+            print(
+                f"| {str(day_data['sleep_duration']):>13}  |{str(day_data['sleep_disturbances']):>18}  |{output:>18}  |{sdu_label:>32}  |{sdi_label:>36}  |"
+            )
+        else:
+            print(
+                f"| {str(day_data['sleep_duration']):>13}  |{str(day_data['sleep_disturbances']):>18}  |{output:>18}  |{'N/A':>32}  |{'N/A':>36}  |"
+            )
+    print("-" * 134)
+    del model
+    del scaler
+    del anomaly_threshold
