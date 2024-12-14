@@ -31,7 +31,7 @@ class GeneralisedModel:
             quality_range = "Excellent"
         return quality_range
 
-    def get_sleep_duration_score(self, sleep_duration: float) -> tuple[int, str]:
+    def get_sleep_duration_score(self, sleep_duration: float):
         if sleep_duration <= 3:
             score = 3  # Extreme insufficient sleep
         elif 3 < sleep_duration <= 6:
@@ -46,7 +46,7 @@ class GeneralisedModel:
         quality_range = self.get_score_quality(score)
         return score, quality_range
 
-    def get_sleep_duration_label(self, sleep_duration: float) -> tuple[int, str]:
+    def get_sleep_duration_label(self, sleep_duration: float):
         if sleep_duration <= 3:
             label = "Extreme insufficient sleep"
         elif 3 < sleep_duration <= 6:
@@ -78,7 +78,7 @@ class GeneralisedModel:
             label = "Emergency"
         return label
 
-    def get_eating_count_score(self, eating_count: float) -> tuple[int, str]:
+    def get_eating_count_score(self, eating_count: float):
         if eating_count == 0:
             score = 0  # No Food taken
         elif eating_count == 1:
@@ -97,7 +97,7 @@ class GeneralisedModel:
         quality_range = self.get_score_quality(score)
         return score, quality_range
 
-    def get_cooking_count_score(self, cooking_count: float) -> tuple[int, str]:
+    def get_cooking_count_score(self, cooking_count: float):
         if cooking_count == 0:
             score = 0  # No Food cooked
         elif cooking_count == 1:
