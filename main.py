@@ -1,7 +1,7 @@
 from utils.preprocessing import perform_cleaning_resampling_splitting_and_data_injection
 from utils.lagged_features import get_lagged_features_dataframe
 from utils.personalised_model import execute_personalised_model, execute_example_flow
-
+from utils.dbscan import test_dbscan_clustering
 
 import numpy as np
 import pandas as pd
@@ -27,6 +27,7 @@ lagged_train_data = get_lagged_features_dataframe(train_data, sleep_features, la
 lagged_test_data = get_lagged_features_dataframe(test_data, sleep_features, lag_size=lag_size)
 
 
+###### PERSONALISED MODEL ######
 print("Accuracy Without Lagged Features")
 # skipping first 4 items so that the number of number of data points are same
 
@@ -38,7 +39,14 @@ print("Accuracy With Lagged Features")
 execute_personalised_model(lagged_train_data, lagged_test_data)  # with Lagged Features
 
 
-###### EXAMPLE ######
+###### DBSCAN MODEL ######
+print("\n\nWithout Lagged Features")
+test_dbscan_clustering(test_data[sleep_features], test_data["label"])  # without Lagged Features
+print("\n\nWith Lagged Features")
+test_dbscan_clustering(lagged_test_data, lagged_test_data["label"])  # with Lagged Features
+
+
+###### EXAMPLE EXECUTION ######
 
 print("\n\nExample Output for Personalised and Generalised Models Together")
 example_data = {
