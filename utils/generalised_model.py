@@ -11,6 +11,16 @@ class GeneralisedModel:
         self.question_5 = "Does the person fail to eat a healthy diet?"
         self.question_6 = "Does the person's day lack structure?"
 
+        self.CRITICAL_LIMITS = {
+            "sleep_duration": (3, 16),  # left -> lower critical limit | right -> upper critical limit
+            "sleep_disturbances": (0, 4),  # left -> lower critical limit | right -> upper critical limit
+        }
+
+        self.PERFECT_RANGES = {
+            "sleep_duration": (7, 8),  # left -> lower perfect range | right -> upper perfect range
+            "sleep_disturbances": (0, 0),  # left -> lower perfect range | right -> upper perfect range
+        }
+
         self.FEATURE_MAPPING = {
             self.question_1: ("sleep_duration", "sleep_disturbances"),
             self.question_2: ("sleep_disturbances",),
@@ -19,6 +29,35 @@ class GeneralisedModel:
             self.question_5: ("eating_count", "cooking_count"),
             # self.question_6: {},
         }
+
+    def calculate_score(self, feature, value):
+        """
+        Scoring in eGRIST is from 1 to 10
+        """
+        critical_lower_limit, critical_upper_limit = self.CRITICAL_LIMITS[feature]
+        perfect_range_lower_limit, perfect_range_upper_limit = self.PERFECT_RANGES[feature]
+
+        # If value is within the perfect_range_lower_limit and perfect_range_upper_limit, then score is 1 (simply 10)
+        value = float(value)
+        if perfect_range_lower_limit <= value <= perfect_range_upper_limit:
+            return 10
+
+        # If value is below the perfect_range_lower_limit
+        if critical_lower_limit <= value < perfect_range_lower_limit:
+            slope = 1 / (
+                perfect_range_lower_limit - critical_lower_limit
+            )  # Slope from critical_lower_limit to perfect_range_lower_limit
+            return int(round(slope * (value - critical_lower_limit) * 10, 0))
+
+        # If value is above the upper range
+        if perfect_range_upper_limit < value <= critical_upper_limit:
+            slope = 1 / (
+                critical_upper_limit - perfect_range_upper_limit
+            )  # Slope from perfect_range_upper_limit to critical_upper_limit
+            return int(round((1 - slope * (value - perfect_range_upper_limit)) * 10, 0))
+
+        # If value is outside [critical_lower_limit, critical_upper_limit], then return 0
+        return 0
 
     def get_score_quality(self, score):
         if score <= 3:
@@ -32,16 +71,7 @@ class GeneralisedModel:
         return quality_range
 
     def get_sleep_duration_score(self, sleep_duration: float):
-        if sleep_duration <= 3:
-            score = 3  # Extreme insufficient sleep
-        elif 3 < sleep_duration <= 6:
-            score = 7  # Insufficient sleep
-        elif 6 < sleep_duration <= 10:
-            score = 10  # Normal sleep
-        elif 10 < sleep_duration <= 14:
-            score = 7  # Oversleeping
-        else:
-            score = 3  # Extreme oversleeping
+        score = self.calculate_score("sleep_duration", sleep_duration)
 
         quality_range = self.get_score_quality(score)
         return score, quality_range
@@ -60,12 +90,7 @@ class GeneralisedModel:
         return label
 
     def get_sleep_disturbance_score(self, sleep_disturbances):
-        if sleep_disturbances <= 2:
-            score = 10
-        elif sleep_disturbances <= 5:
-            score = 5
-        else:
-            score = 0
+        score = self.calculate_score("sleep_disturbances", sleep_disturbances)
         quality_range = self.get_score_quality(score)
         return score, quality_range
 

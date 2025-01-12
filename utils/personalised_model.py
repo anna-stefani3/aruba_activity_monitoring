@@ -82,10 +82,9 @@ def execute_example_flow(train_data, test_data):
 
     predictions = [0] * test_data.shape[0]
     generalised_model = GeneralisedModel()
-    print(
-        "| Sleep Duration | Sleep Disturbances | Personalised Label | Generalised Sleep Duration Label | Generalised Sleep Disturbances Label |"
-    )
-    print("-" * 134)
+    header = "| Sleep Duration | Sleep Disturbances | Personalised Label | Generalised Sleep Duration Score | Generalised Sleep Duration Label | Generalised Sleep Disturbances Score | Generalised Sleep Disturbances Label |"
+    print(header)
+    print("-" * len(header))
     for i in range(test_data.shape[0]):
         day_data = test_data.iloc[i]
         scaled_day_data = scaler.transform(day_data.values.reshape(1, -1))
@@ -95,16 +94,19 @@ def execute_example_flow(train_data, test_data):
         if score < anomaly_threshold:
             predictions[i] = 1
             output = "Anomaly"
+            sdu_score, _ = generalised_model.get_sleep_duration_score(day_data["sleep_duration"])
             sdu_label = generalised_model.get_sleep_duration_label(day_data["sleep_duration"])
+
+            sdi_score, _ = generalised_model.get_sleep_disturbance_score(day_data["sleep_disturbances"])
             sdi_label = generalised_model.get_sleep_disturbance_label(day_data["sleep_disturbances"])
             print(
-                f"| {str(day_data['sleep_duration']):>13}  |{str(day_data['sleep_disturbances']):>18}  |{output:>18}  |{sdu_label:>32}  |{sdi_label:>36}  |"
+                f"| {str(day_data['sleep_duration']):>13}  |{str(day_data['sleep_disturbances']):>18}  |{output:>18}  |{str(sdu_score):>32}  |{sdu_label:>32}  |{str(sdi_score):>36}  |{sdi_label:>36}  |"
             )
         else:
             print(
-                f"| {str(day_data['sleep_duration']):>13}  |{str(day_data['sleep_disturbances']):>18}  |{output:>18}  |{'N/A':>32}  |{'N/A':>36}  |"
+                f"| {str(day_data['sleep_duration']):>13}  |{str(day_data['sleep_disturbances']):>18}  |{output:>18}  |{'N/A':>32}  |{'N/A':>32}  |{'N/A':>36}  |{'N/A':>36}  |"
             )
-    print("-" * 134)
+    print("-" * len(header))
     del model
     del scaler
     del anomaly_threshold
