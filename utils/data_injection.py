@@ -88,7 +88,7 @@ def gaussian_based_inject_anomalies_continuous_days(
 
                 # adding noise to current increament size
                 # current_increament_size += increament_noise
-                new_sleep_duration_value = stats.loc["sleep_duration", "mean"] + (
+                new_sleep_duration_value = test_injected.loc[start_row + i, "sleep_duration"] + (
                     anomaly_scale * stats.loc["sleep_duration", "std"]
                 )  # + current_increament_size
 
@@ -114,7 +114,7 @@ def gaussian_based_inject_anomalies_continuous_days(
                 # decrement_noise is random number between 0.05 and 0.25 which will be added to current_decrement_size
                 decrement_noise = np.random.uniform(0.05, 0.25)
                 current_decrement_size += decrement_noise
-                new_sleep_duration_value = stats.loc["sleep_duration", "mean"] - (
+                new_sleep_duration_value = test_injected.loc[start_row + i, "sleep_duration"] - (
                     anomaly_scale * stats.loc["sleep_duration", "std"]
                 )  # - current_decrement_size
 
