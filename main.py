@@ -1,7 +1,7 @@
 from utils.preprocessing import perform_cleaning_resampling_splitting_and_data_injection
 from utils.lagged_features import get_lagged_features_dataframe
 from utils.personalised_model import execute_personalised_model, execute_example_flow
-from utils.dbscan import test_dbscan_clustering
+from utils.dbscan import test_dbscan_clustering, scatter_plot_dbscan
 
 import numpy as np
 import pandas as pd
@@ -41,7 +41,8 @@ execute_personalised_model(lagged_train_data, lagged_test_data)  # with Lagged F
 
 ###### DBSCAN MODEL ######
 print("\n\nWithout Lagged Features")
-test_dbscan_clustering(test_data[sleep_features], test_data["label"])  # without Lagged Features
+cluster_labels = test_dbscan_clustering(test_data[sleep_features], test_data["label"])  # without Lagged Features
+scatter_plot_dbscan(test_data[sleep_features], cluster_labels)
 print("\n\nWith Lagged Features")
 test_dbscan_clustering(lagged_test_data, lagged_test_data["label"])  # with Lagged Features
 

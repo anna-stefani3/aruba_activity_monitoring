@@ -5,7 +5,7 @@ from .data_injection import (
     gaussian_based_inject_anomalies_continuous_days,
 )
 import numpy as np
-from utils.plotting import plot_all_features_with_clusters
+from utils.plotting import plot_all_features_with_clusters, plot_histogram
 
 
 class Preprocessing:
@@ -97,18 +97,35 @@ def perform_cleaning_resampling_splitting_and_data_injection(
     df = preprocessing.get_cleaned_dataframe(filename)
 
     df = preprocessing.get_stats_dataframe(df)
+    plot_histogram(
+        df,
+        column_name="sleep_duration",
+        plot_title="SLEEP DURATION HISTOGRAM PLOT [ORIGINAL DATA]",
+        num_bins=48,
+    )
     plot_all_features_with_clusters(df, plot_title="ORIGINAL DATA PLOT")
 
     df = preprocessing.clean_data_anomalies(df)
     plot_all_features_with_clusters(df, plot_title="ORIGINAL DATA AFTER CLEANING ANOMALIES")
 
     df = preprocessing.get_resampled_dataframe(df)
-
+    plot_histogram(
+        df,
+        column_name="sleep_duration",
+        plot_title="SLEEP DURATION HISTOGRAM PLOT [AFTER RESAMPLING]",
+        num_bins=48,
+    )
     train_data, test_data = preprocessing.apply_train_test_split(df, split_index=split_index)
     train_data = train_data.copy()
     test_data = test_data.copy()
     train_data["label"] = 0  # 0 represent normal and 1 will represent abnormal
     test_data["label"] = 0  # 0 represent normal and 1 will represent abnormal
     injected_test_data = preprocessing.get_injected_dataframe(test_data, features=features)
+    plot_histogram(
+        injected_test_data,
+        column_name="sleep_duration",
+        plot_title="SLEEP DURATION HISTOGRAM PLOT [AFTER INJECTION]",
+        num_bins=48,
+    )
     plot_all_features_with_clusters(injected_test_data, plot_title="Injected Data Plotting")
     return train_data, injected_test_data

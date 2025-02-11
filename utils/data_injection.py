@@ -43,7 +43,7 @@ def generate_synthetic_data_using_gmm_and_poisson(original_data, n_components=3,
 
 
 def gaussian_based_inject_anomalies_continuous_days(
-    test_df, feature_list, injections_count, min_number_days, max_number_days, anomaly_scale: int = 3
+    test_df, feature_list, injections_count, min_number_days, max_number_days, anomaly_scale: int = 1
 ):
     """
     Inject anomalies over continuous days in test data based on training stats.
